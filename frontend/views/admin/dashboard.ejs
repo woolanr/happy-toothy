@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin - Happy Toothy</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard Admin</h1>
+        <p>Selamat datang, <span id="adminUsername">Admin!</span></p>
+        <button id="logoutButton">Logout</button>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <h3>Total Pengguna</h3>
+                <p id="totalUsers">0</p>
+            </div>
+            <div class="card">
+                <h3>Total Dokter</h3>
+                <p id="totalDoctors">0</p>
+            </div>
+            <div class="card">
+                <h3>Verifikasi Tertunda</h3>
+                <p id="pendingVerifications">0</p>
+            </div>
+        </div>
+
+        <div class="user-management-section">
+            <h3>Manajemen Pengguna</h3>
+
+            <div class="add-user-form-container">
+                <h4>Tambahkan Pengguna Baru</h4>
+                <form id="addUserForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="addUser_nama_lengkap">Nama Lengkap:</label>
+                            <input type="text" id="addUser_nama_lengkap" name="nama_lengkap" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="addUser_email">Email:</label>
+                            <input type="email" id="addUser_email" name="email" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="addUser_username">Username:</label>
+                            <input type="text" id="addUser_username" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="addUser_password">Password:</label>
+                            <input type="password" id="addUser_password" name="password" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="addUser_id_level_user">Level Pengguna:</label>
+                        <select id="addUser_id_level_user" name="id_level_user" required>
+                            <option value="1">Admin</option>
+                            <option value="2">Dokter</option>
+                            <option value="3">Staff</option>
+                            <option value="4">Pasien</option>
+                        </select>
+                    </div>
+                    <button type="submit">Tambahkan Pengguna</button>
+                </form>
+            </div>
+
+            <h4>Daftar Pengguna</h4>
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Nama Lengkap</th>
+                        <th>Level</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="userListBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+    <script src="../js/admin.js"></script> </body>
+</html>
