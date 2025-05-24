@@ -1,9 +1,11 @@
 // backend/controllers/authController.js
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
-const User = require('../models/userModel'); // Pastikan userModel.js sudah mengembalikan Promise
+const User = require('../models/userModel');
 const { sendVerificationEmail } = require('../utils/email');
-const db = require('../config/database'); // Pastikan Anda mengimpor koneksi db jika dipakai langsung di sini (contoh di register)
+const db = require('../config/database'); 
+const jwt = require('jsonwebtoken');
+const config = require('../config/config');
 
 const authController = {
     register: async (req, res) => {
@@ -125,7 +127,6 @@ const authController = {
 
     login: async (req, res) => {
         console.log('Login request received for username:', req.body.username); // Log 1
-
         const { username, password } = req.body;
 
         if (!username || !password) {
@@ -167,21 +168,37 @@ const authController = {
                 return res.status(401).json({ message: 'Username atau password salah.' });
             }
 
-            // Login Berhasil
-            console.log('Login successful! Sending 200 OK response.'); // Log 13: Pesan sukses
+            // Login Berhasil, Buat JWT
+            console.log('Attempting to sign JWT with secret:', config.jwtSecret ? 'Exists' : 'Missing');
+            const token = jwt.sign(
+                {
+                    id_user: user.id_user,
+                    id_level_user: user.id_level_user,
+                    username: user.username
+                },
+                config.jwtSecret,
+                { expiresIn: config.jwtExpiresIn }
+            );
+            console.log('JWT Token generated (backend side):', token ? token.substring(0, 20) + '...' : 'null or empty');
+
+            // Ini adalah respons yang akan dikirimkan
+            console.log('Login successful! Sending 200 OK response. Response.');
             res.status(200).json({
                 message: 'Login berhasil!',
+                token: token, // <--- Baris ini seharusnya menambahkan token
                 user: {
                     id_user: user.id_user,
                     username: user.username,
-                    id_level_user: user.id_level_user // Penting untuk frontend
+                    id_level_user: user.id_level_user
                 }
             });
 
         } catch (error) {
             console.error('Error during login process (caught by try...catch):', error); // Log 14: Pesan error umum
+            if (!res.headersSent) {
             res.status(500).json({ message: 'Terjadi kesalahan server.' });
         }
+    }
     },
 
     forgotPassword: async (req, res) => {

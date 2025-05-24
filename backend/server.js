@@ -14,7 +14,12 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../frontend/views'));
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: '*', // Izinkan dari domain mana saja (untuk development, BAHAYA UNTUK PRODUKSI!)
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Metode yang diizinkan
+    allowedHeaders: ['Content-Type', 'Authorization'] // <<-- INI PENTING: Izinkan Authorization header
+}));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 

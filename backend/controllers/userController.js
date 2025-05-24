@@ -5,10 +5,35 @@ const db = require('../config/database'); // Pastikan db sudah diimpor jika dipe
 
 const userController = {
     // Fungsi untuk menampilkan dashboard admin (misalnya data ringkasan)
-    getAdminDashboardData: (req, res) => {
-        // Logika untuk mengambil data ringkasan dari DB
+    getAdminDashboardData: async (req, res) => {
+        try {
+            const loggedInUser = req.user;
+            const adminProfile = await new Promise((resolve, reject) => {
+                db.query('SELECT nama_lengkap, tanggal_lahir, jenis_kelamin FROM PROFILE WHERE id_profile = (SELECT id_profile FROM USERS WHERE id_user = ?)', [loggedInUser.id_user], (err, results) => {
+                    if (err) return reject(err);
+                    resolve(results[0]);
+                });
+            });
+            // Hitung usia dari tanggal_lahir
+            let usia = null;
+            if (adminProfile && adminProfile.tanggal_lahir) {
+                const birthDate = new Date(adminProfile.tanggal_lahir);
+                const today = new Date();
+                usia = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    usia--;
+                }
+            }
+
         res.status(200).json({
             message: 'Selamat datang di Dashboard Admin Happy Toothy!',
+            user: { // Kirim detail user yang login
+                    username: loggedInUser.username,
+                    nama_lengkap: adminProfile ? adminProfile.nama_lengkap : 'Admin',
+                    jenis_kelamin: adminProfile ? adminProfile.jenis_kelamin : '-',
+                    usia: usia || '-'
+                },
             summary: {
                 totalUsers: 100,
                 totalDoctors: 10,
@@ -16,6 +41,10 @@ const userController = {
                 pendingVerifications: 5
             }
         });
+    } catch (error) {
+        console.error('Error getting admin dashboard data:', error);
+        res.status(500).json({ message: 'Terjadi kesalahan saat memuat data dashboard.' });
+    }
     },
 
     // Fungsi untuk mendapatkan daftar semua pengguna
