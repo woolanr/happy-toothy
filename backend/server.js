@@ -39,20 +39,20 @@ app.get('/register', (req, res) => {
     res.render('register');
 });
 
-// Route untuk halaman registrasi admin (menampilkan EJS)
-// Ini adalah halaman visual untuk mengisi form registrasi admin
+app.get('/forgot-password', (req, res) => {
+    res.render('forgot-password');
+});
+
+app.get('/reset-password', (req, res) => {
+    res.render('reset-password');
+});
+
 app.get('/admin/register', (req, res) => { // Route untuk halaman registrasi admin
     res.render('admin/register');
 });
 
-// --- TAMBAH ROUTE INI UNTUK MENAMPILKAN HALAMAN DASHBOARD ADMIN ---
-// Ketika browser mengakses /admin/dashboard, render file dashboard.ejs
 app.get('/admin/dashboard', (req, res) => {
     res.render('admin/dashboard');
-});
-
-app.get('/forgot-password', (req, res) => {
-    res.render('forgot-password');
 });
 
 // Gunakan authRoutes untuk route API otentikasi

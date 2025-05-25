@@ -184,6 +184,78 @@ function performRedirect(userData) {
     }
 }
 
+// --- FUNGSI BARU UNTUK LUPA PASSWORD ---
+async function handleForgotPasswordFormSubmit(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const email = form.email.value;
+
+    try {
+        console.log('Frontend: Sending forgot password request for email:', email);
+        const response = await fetch('/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+
+        const data = await response.json();
+        console.log('Frontend: Forgot password response:', data);
+
+        if (response.ok) {
+            alert(data.message);
+        } else {
+            alert(data.message);
+        }
+    } catch (error) {
+        console.error('Frontend: Forgot password error:', error);
+        alert('Terjadi kesalahan saat meminta reset password.');
+    }
+}
+
+// --- FUNGSI BARU UNTUK RESET PASSWORD ---
+async function handleResetPasswordFormSubmit(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const newPassword = form.newPassword.value;
+    const confirmPassword = form.confirmPassword.value;
+
+    if (newPassword !== confirmPassword) {
+        alert('Password baru dan konfirmasi password tidak cocok.');
+        return;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    if (!token) {
+        alert('Token reset password tidak ditemukan di URL.');
+        return;
+    }
+
+    try {
+        console.log('Frontend: Sending reset password request with token:', token.substring(0, 10) + '...');
+        const response = await fetch('/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, newPassword })
+        });
+
+        const data = await response.json();
+        console.log('Frontend: Reset password response:', data);
+
+        if (response.ok) {
+            alert(data.message);
+            window.location.href = '/login'; // Redirect ke halaman login setelah berhasil
+        } else {
+            alert(data.message);
+        }
+    } catch (error) {
+        console.error('Frontend: Reset password error:', error);
+        alert('Terjadi kesalahan saat mereset password.');
+    }
+}
+
 // --- Event Listeners untuk Formulir ---
 const loginForm = document.querySelector('#loginForm');
 if (loginForm) {
@@ -201,6 +273,18 @@ const registerForm = document.querySelector('#registerForm');
 if (registerForm) {
     registerForm.addEventListener('submit', handleRegisterFormSubmit);
     console.log('Frontend: User Register form event listener added.');
+}
+
+const forgotPasswordForm = document.querySelector('#forgotPasswordForm');
+if (forgotPasswordForm) {
+    forgotPasswordForm.addEventListener('submit', handleForgotPasswordFormSubmit);
+    console.log('Frontend: Forgot password form event listener added.');
+}
+
+const resetPasswordForm = document.querySelector('#resetPasswordForm');
+if (resetPasswordForm) {
+    resetPasswordForm.addEventListener('submit', handleResetPasswordFormSubmit);
+    console.log('Frontend: Reset password form event listener added.');
 }
 
 // --- Fungsi Logout ---
@@ -252,11 +336,20 @@ async function fetchDashboardData() {
             const totalDoctorsEl = document.getElementById('totalDoctors');
             const pendingVerificationsEl = document.getElementById('pendingVerifications');
             const adminUsernameEl = document.getElementById('adminUsername');
+            const adminNamaLengkapEl = document.getElementById('adminNamaLengkap'); // Tambahkan ini
+            const adminJenisKelaminEl = document.getElementById('adminJenisKelamin'); // Tambahkan ini
+            const adminUsiaEl = document.getElementById('adminUsia'); // Tambahkan ini
 
             if (totalUsersEl) totalUsersEl.textContent = data.summary.totalUsers;
             if (totalDoctorsEl) totalDoctorsEl.textContent = data.summary.totalDoctors;
             if (pendingVerificationsEl) pendingVerificationsEl.textContent = data.summary.pendingVerifications;
-            if (adminUsernameEl) adminUsernameEl.textContent = data.user.username; // Asumsi API mengembalikan username admin
+            
+            // Perbarui info user yang login
+            if (adminUsernameEl) adminUsernameEl.textContent = data.user.username;
+            if (adminNamaLengkapEl) adminNamaLengkapEl.textContent = data.user.nama_lengkap;
+            if (adminJenisKelaminEl) adminJenisKelaminEl.textContent = data.user.jenis_kelamin;
+            if (adminUsiaEl) adminUsiaEl.textContent = data.user.usia;
+
         } else if (response.status === 401 || response.status === 403) {
             alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
             localStorage.removeItem('token');
@@ -398,26 +491,67 @@ async function handleVerifyUser(event) {
 // --- Event listener utama untuk DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('script.js (DOMContentLoaded): DOM fully loaded and parsed.');
+    // --- Event Listeners untuk Formulir Login/Registrasi (dari script.js asli) ---
+    const loginForm = document.querySelector('#loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLoginFormSubmit);
+        console.log('Frontend: Login form event listener added.');
+    }
 
-    // Logika pengecekan token di awal saat DOMContentLoaded terpicu
-    // Ini berlaku untuk semua halaman yang memuat script ini
-    const currentPath = window.location.pathname;
+    const adminRegisterForm = document.querySelector('#adminRegisterForm');
+    if (adminRegisterForm) {
+        adminRegisterForm.addEventListener('submit', handleAdminRegisterFormSubmit);
+        console.log('Frontend: Admin Register form event listener added.');
+    }
 
-    // Hanya jalankan logika fetch data dashboard/users jika berada di halaman admin dashboard
-    if (currentPath.startsWith('/admin/dashboard')) {
-        const token = getToken();
-        if (!token) {
-            console.warn('script.js (DOMContentLoaded): No token found for admin dashboard. Redirecting to login.');
-            alert('Sesi Anda telah berakhir atau Anda belum login. Silakan login kembali.');
-            localStorage.removeItem('token'); // Pastikan token invalid/expired dihapus
+    const registerForm = document.querySelector('#registerForm');
+    if (registerForm) {
+        registerForm.addEventListener('submit', handleRegisterFormSubmit);
+        console.log('Frontend: User Register form event listener added.');
+    }
+
+    const forgotPasswordForm = document.querySelector('#forgotPasswordForm');
+    if (forgotPasswordForm) {
+        forgotPasswordForm.addEventListener('submit', handleForgotPasswordFormSubmit);
+        console.log('Frontend: Forgot password form event listener added.');
+    }
+
+    const resetPasswordForm = document.querySelector('#resetPasswordForm');
+    if (resetPasswordForm) {
+        resetPasswordForm.addEventListener('submit', handleResetPasswordFormSubmit);
+        console.log('Frontend: Reset password form event listener added.');
+    }
+
+    // --- Fungsi Logout ---
+    const logoutButton = document.getElementById('logoutButton');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', () => {
+            localStorage.removeItem('token');
+            alert('Anda telah logout.');
             window.location.href = '/login';
-            return; // Hentikan eksekusi lebih lanjut jika tidak ada token
+        });
+    }
+
+        // --- Panggilan Fungsi Dashboard/User Management ---
+        const currentPath = window.location.pathname;
+        // Hanya jalankan logika fetch data dashboard/users jika berada di halaman admin dashboard
+        if (currentPath === '/admin/dashboard') { // Ubah startsWith menjadi === untuk exact match
+            console.log('script.js (DOMContentLoaded): On admin dashboard page. Attempting to fetch data.');
+            const token = getToken(); // Panggil getToken di sini
+            if (!token) {
+                console.warn('script.js (DOMContentLoaded): No token found for admin dashboard. Redirecting to login.');
+                alert('Sesi Anda telah berakhir atau Anda belum login. Silakan login kembali.');
+                localStorage.removeItem('token'); // Pastikan token invalid/expired dihapus
+                window.location.href = '/login';
+                return; // Hentikan eksekusi lebih lanjut jika tidak ada token
         }
 
-        // Panggil fungsi-fungsi fetch data admin hanya jika token ada dan ini adalah halaman admin dashboard
         fetchDashboardData();
         fetchUsers();
+    } else {
+        console.log('script.js (DOMContentLoaded): Not on admin dashboard. Skipping data fetch.');
     }
+});
     // Jika ada halaman dashboard lain (dokter, staff, pasien) yang juga perlu data terautentikasi,
     // Anda bisa menambahkan kondisi serupa di sini
     // else if (currentPath.startsWith('/dokter/dashboard')) {
@@ -430,5 +564,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     //     }
     //     // Panggil fungsi fetch data untuk dokter
     //     // fetchDokterData();
-    // }
-});
+    //}
