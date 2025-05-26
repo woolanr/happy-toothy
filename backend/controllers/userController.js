@@ -8,12 +8,19 @@ const userController = {
     getAdminDashboardData: async (req, res) => {
         try {
             const loggedInUser = req.user;
-            const adminProfile = await new Promise((resolve, reject) => {
+
+            // Ambil data profil admin yang login untuk nama lengkap, jenis kelamin, dan usia
+            const adminProfileResults = await new Promise((resolve, reject) => {
+                // Pastikan `db` di sini diakses dengan benar
                 db.query('SELECT nama_lengkap, tanggal_lahir, jenis_kelamin FROM PROFILE WHERE id_profile = (SELECT id_profile FROM USERS WHERE id_user = ?)', [loggedInUser.id_user], (err, results) => {
                     if (err) return reject(err);
-                    resolve(results[0]);
+                    resolve(results); // Resolve dengan seluruh array results
                 });
             });
+
+             // Periksa apakah ada hasil untuk adminProfile sebelum mengakses results[0]
+            const adminProfile = adminProfileResults && adminProfileResults.length > 0 ? adminProfileResults[0] : null;
+
             // Hitung usia dari tanggal_lahir
             let usia = null;
             if (adminProfile && adminProfile.tanggal_lahir) {
@@ -26,41 +33,62 @@ const userController = {
                 }
             }
 
-        res.status(200).json({
-            message: 'Selamat datang di Dashboard Admin Happy Toothy!',
-            user: { // Kirim detail user yang login
+            // --- Bagian untuk mengambil data ringkasan dinamis dari database ---
+            // Menggunakan helper function agar kode lebih bersih
+            const fetchCount = (query, params = []) => {
+                return new Promise((resolve, reject) => {
+                    db.query(query, params, (err, results) => {
+                        if (err) return reject(err);
+                        // Menggunakan operator && untuk safety check
+                        resolve(results && results.length > 0 ? results[0].total : 0);
+                    });
+                });
+            };
+            const totalUsers = await fetchCount('SELECT COUNT(id_user) AS total FROM USERS');
+            const totalDoctors = await fetchCount('SELECT COUNT(id_user) AS total FROM USERS WHERE id_level_user = 2');
+            const totalPatients = await fetchCount('SELECT COUNT(id_user) AS total FROM USERS WHERE id_level_user = 4');
+            const pendingVerifications = await fetchCount('SELECT COUNT(id_user) AS total FROM USERS WHERE id_status_valid = 2');
+            // --- Akhir Bagian untuk mengambil data ringkasan dinamis ---
+
+            res.status(200).json({
+                message: 'Selamat datang di Dashboard Admin Happy Toothy!',
+                user: { // Kirim detail user yang 
+                    id_user: loggedInUser.id_user,
                     username: loggedInUser.username,
+                    id_level_user: loggedInUser.id_level_user,
                     nama_lengkap: adminProfile ? adminProfile.nama_lengkap : 'Admin',
                     jenis_kelamin: adminProfile ? adminProfile.jenis_kelamin : '-',
                     usia: usia || '-'
                 },
-            summary: {
-                totalUsers: 100,
-                totalDoctors: 10,
-                totalPatients: 80,
-                pendingVerifications: 5
-            }
-        });
-    } catch (error) {
-        console.error('Error getting admin dashboard data:', error);
-        res.status(500).json({ message: 'Terjadi kesalahan saat memuat data dashboard.' });
-    }
+                summary: {
+                    totalUsers: totalUsers,
+                    totalDoctors: totalDoctors,
+                    totalPatients: totalPatients,
+                    pendingVerifications: pendingVerifications
+                }
+            });
+        } catch (error) {
+            console.error('userController: Error in getAdminDashboardData (caught by general catch):', error);
+            res.status(500).json({ message: 'Terjadi kesalahan server.' });
+        }
     },
 
     // Fungsi untuk mendapatkan daftar semua pengguna
     getAllUsers: async (req, res) => {
-        try {
-            // Asumsi User.findAll mengembalikan Promise
-            const users = await new Promise((resolve, reject) => {
-                User.findAll((err, results) => { // Perlu implementasi User.findAll di userModel.js
-                    if (err) return reject(err);
-                    resolve(results);
-                });
-            });
-            res.status(200).json({ users });
+        try { 
+            console.log('userController: getAllUsers called. Fetching all users from model.'); // LOG BARU
+            const users = await User.findAll(); // Ini memanggil userModel.findAll()
+            console.log('userController: getAllUsers - Users received from model:', users); // LOG BARU
+            console.log('userController: getAllUsers - Number of users received:', users ? users.length : 0); // LOG BARU
+
+            console.log('userController: getAllUsers - Sending 200 OK response with users data.'); // LOG BARU
+            res.status(200).json({ users: users });
+            console.log('userController: getAllUsers - Response sent.'); // LOG BARU
         } catch (error) {
-            console.error('Error getting all users:', error);
-            res.status(500).json({ message: 'Terjadi kesalahan saat mengambil data pengguna.' });
+            console.error('userController: getAllUsers - Error (caught by general catch):', error); // LOG BARU
+            if (!res.headersSent) {
+                res.status(500).json({ message: 'Terjadi kesalahan server saat mengambil daftar pengguna.' });
+            }
         }
     },
 
@@ -152,48 +180,41 @@ const userController = {
         const { id } = req.params; // ID pengguna yang akan diedit
         const { nama_lengkap, email, username, id_level_user, id_status_valid } = req.body;
 
-        // Validasi input (minimal satu field harus diisi)
+       // Validasi input
+        if (!id) {
+            return res.status(400).json({ message: 'ID pengguna diperlukan untuk update.' });
+        }
         if (!nama_lengkap && !email && !username && !id_level_user && !id_status_valid) {
             return res.status(400).json({ message: 'Setidaknya satu field harus diisi untuk update.' });
         }
 
         try {
-            // Temukan pengguna berdasarkan ID
-            const users = await new Promise((resolve, reject) => {
-                User.findById(id, (err, results) => { // Perlu implementasi findById di userModel.js
-                    if (err) return reject(err);
-                    resolve(results);
-                });
-            });
-
+            // Temukan pengguna berdasarkan ID untuk mendapatkan id_profile
+            const users = await User.findById(id); // Pastikan findById mengembalikan Promise
             if (users.length === 0) {
                 return res.status(404).json({ message: 'Pengguna tidak ditemukan.' });
             }
-
             const user = users[0];
+
             const updatedUserData = {};
             const updatedProfileData = {};
 
-            if (username) updatedUserData.username = username;
-            if (email) {
+            // Hanya tambahkan ke objek update jika ada perubahan dari request body
+            if (username !== undefined) updatedUserData.username = username;
+            if (email !== undefined) {
                 updatedUserData.email = email;
                 updatedProfileData.email = email; // Update juga di profile jika disimpan disana
             }
-            if (id_level_user) updatedUserData.id_level_user = id_level_user;
-            if (id_status_valid) updatedUserData.id_status_valid = id_status_valid;
-            if (nama_lengkap) updatedProfileData.nama_lengkap = nama_lengkap;
+            if (id_level_user !== undefined) updatedUserData.id_level_user = parseInt(id_level_user); // Pastikan int
+            if (id_status_valid !== undefined) updatedUserData.id_status_valid = parseInt(id_status_valid); // Pastikan int
+            if (nama_lengkap !== undefined) updatedProfileData.nama_lengkap = nama_lengkap;
 
             // Lakukan update ke tabel USERS
             if (Object.keys(updatedUserData).length > 0) {
-                await new Promise((resolve, reject) => {
-                    User.updateUser(id, updatedUserData, (err) => { // Perlu implementasi updateUser di userModel.js
-                        if (err) return reject(err);
-                        resolve();
-                    });
-                });
+                await User.updateUser(id, updatedUserData); // Pastikan updateUser mengembalikan Promise
             }
 
-            // Lakukan update ke tabel PROFILE (jika ada perubahan)
+            // Lakukan update ke tabel PROFILE (jika ada perubahan dan id_profile tersedia)
             if (Object.keys(updatedProfileData).length > 0 && user.id_profile) {
                  await new Promise((resolve, reject) => {
                     db.query('UPDATE PROFILE SET ? WHERE id_profile = ?', [updatedProfileData, user.id_profile], (err, result) => {

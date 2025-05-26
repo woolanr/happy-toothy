@@ -418,17 +418,129 @@ async function fetchUsers() {
     }
 }
 
+// --- FUNGSI BARU UNTUK MEMBUAT DAN MENAMPILKAN MODAL EDIT ---
+function createEditUserModal(user) {
+    const modal = document.createElement('div');
+    modal.id = 'editUserModal';
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0,0,0,0.5); display: flex;
+        justify-content: center; align-items: center; z-index: 1000;
+    `;
+
+    modal.innerHTML = `
+        <div style="background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); max-width: 500px; width: 90%;">
+            <h3>Edit Pengguna</h3>
+            <form id="editUserForm">
+                <input type="hidden" id="edit_id_user" value="${user.id_user}">
+                <div class="form-group">
+                    <label for="edit_nama_lengkap">Nama Lengkap:</label>
+                    <input type="text" id="edit_nama_lengkap" name="nama_lengkap" value="${user.nama_lengkap || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_email">Email:</label>
+                    <input type="email" id="edit_email" name="email" value="${user.email}" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_username">Username:</label>
+                    <input type="text" id="edit_username" name="username" value="${user.username}" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_id_level_user">Level Pengguna:</label>
+                    <select id="edit_id_level_user" name="id_level_user" required>
+                        <option value="1" ${user.id_level_user === 1 ? 'selected' : ''}>Admin</option>
+                        <option value="2" ${user.id_level_user === 2 ? 'selected' : ''}>Dokter</option>
+                        <option value="3" ${user.id_level_user === 3 ? 'selected' : ''}>Staff</option>
+                        <option value="4" ${user.id_level_user === 4 ? 'selected' : ''}>Pasien</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit_id_status_valid">Status Validasi:</label>
+                    <select id="edit_id_status_valid" name="id_status_valid" required>
+                        <option value="1" ${user.id_status_valid === 1 ? 'selected' : ''}>Valid</option>
+                        <option value="2" ${user.id_status_valid === 2 ? 'selected' : ''}>Belum Valid</option>
+                        <option value="3" ${user.id_status_valid === 3 ? 'selected' : ''}>Keluar</option>
+                    </select>
+                </div>
+                <button type="submit" style="background-color: #28a745; margin-right: 10px;">Simpan Perubahan</button>
+                <button type="button" id="closeModalBtn" style="background-color: #dc3545;">Batal</button>
+            </form>
+        </div>
+    `;
+
+     document.body.appendChild(modal);
+
+    // Event listener untuk tombol Batal
+    document.getElementById('closeModalBtn').addEventListener('click', () => {
+        modal.remove();
+    });
+
+    // Event listener untuk submit form edit
+    document.getElementById('editUserForm').addEventListener('submit', handleUpdateUser);
+}
+
 // Fungsi untuk menangani edit pengguna (akan menampilkan modal/form terpisah)
 async function handleEditUser(event) {
     const userId = event.target.dataset.id;
-    alert(`Fungsi Edit untuk User ID: ${userId} akan diimplementasikan. Anda bisa membuat modal/form terpisah di sini.`);
-    // Nanti di sini Anda akan mengambil data user berdasarkan ID,
-    // menampilkan modal/form edit dengan data tersebut,
-    // dan mengirim update ke API /admin/users/:id (PUT)
-    // Contoh:
-    // const updatedData = { /* data yang diedit */ };
-    // const response = await fetch(`/admin/users/${userId}`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(updatedData) });
-    // if (response.ok) fetchUsers();
+    try {
+         // Ambil data user spesifik untuk diedit
+        const response = await fetch(`/admin/users/${userId}`, {
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        const result = await response.json();
+
+         if (response.ok && result.users && result.users.length > 0) {
+            createEditUserModal(result.users[0]); // Tampilkan modal dengan data user
+        } else if (response.status === 401 || response.status === 403) {
+            alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        } else {
+            alert(result.message || 'Gagal memuat data pengguna untuk diedit.');
+        }
+    } catch (error) {
+        console.error('script.js (handleEditUser): Error fetching user for edit:', error);
+        alert('Terjadi kesalahan saat memuat data pengguna untuk diedit.');
+    }
+}
+
+async function handleUpdateUser(event) {
+    event.preventDefault();
+    const form = event.target;
+    const userId = document.getElementById('edit_id_user').value;
+
+    const updatedData = {
+        nama_lengkap: form.nama_lengkap.value,
+        email: form.email.value,
+        username: form.username.value,
+        id_level_user: parseInt(form.id_level_user.value),
+        id_status_valid: parseInt(form.id_status_valid.value)
+    };
+    
+    try {
+        const response = await fetch(`/admin/users/${userId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(updatedData)
+        });
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(result.message);
+            document.getElementById('editUserModal').remove(); // Tutup modal
+            fetchUsers(); // Muat ulang daftar pengguna
+        } else if (response.status === 401 || response.status === 403) {
+            alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        } else {
+            alert(result.message || 'Gagal memperbarui pengguna.');
+        }
+    } catch (error) {
+        console.error('script.js (handleUpdateUser): Error updating user:', error);
+        alert('Terjadi kesalahan saat memperbarui pengguna.');
+    }
 }
 
 // Fungsi untuk menangani hapus/nonaktifkan pengguna
@@ -531,21 +643,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.href = '/login';
         });
     }
+    
+    // --- Panggilan Fungsi Dashboard/User Management ---
+    const currentPath = window.location.pathname;
 
-        // --- Panggilan Fungsi Dashboard/User Management ---
-        const currentPath = window.location.pathname;
-        // Hanya jalankan logika fetch data dashboard/users jika berada di halaman admin dashboard
-        if (currentPath === '/admin/dashboard') { // Ubah startsWith menjadi === untuk exact match
-            console.log('script.js (DOMContentLoaded): On admin dashboard page. Attempting to fetch data.');
-            const token = getToken(); // Panggil getToken di sini
-            if (!token) {
-                console.warn('script.js (DOMContentLoaded): No token found for admin dashboard. Redirecting to login.');
-                alert('Sesi Anda telah berakhir atau Anda belum login. Silakan login kembali.');
-                localStorage.removeItem('token'); // Pastikan token invalid/expired dihapus
-                window.location.href = '/login';
-                return; // Hentikan eksekusi lebih lanjut jika tidak ada token
+    if (currentPath === '/admin/dashboard') {
+        console.log('script.js (DOMContentLoaded): On admin dashboard page. Attempting to fetch data.');
+        const token = getToken();
+        if (!token) {
+            console.warn('script.js (DOMContentLoaded): No token found for admin dashboard. Redirecting to login.');
+            alert('Sesi Anda telah berakhir atau Anda belum login. Silakan login kembali.');
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+            return;
         }
-
+        
+        // Panggil fungsi-fungsi fetch data admin hanya jika token ada dan ini adalah halaman admin dashboard
         fetchDashboardData();
         fetchUsers();
     } else {
