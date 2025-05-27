@@ -27,12 +27,13 @@ const User = {
             });
         });
     },
+
     updateStatusValid: (id_user, id_status_valid) => {
         return new Promise((resolve, reject) => {
             db.query('UPDATE USERS SET id_status_valid = ? WHERE id_user = ?', [id_status_valid, id_user], (err, result) => {
                 if (err) return reject(err);
                 resolve(result);
-            });
+            });   
         });
     },
 
@@ -47,8 +48,16 @@ const User = {
 
     findAll: () => {
         return new Promise((resolve, reject) => {
-            db.query('SELECT u.id_user, u.username, u.email, u.id_level_user, u.id_status_valid, p.nama_lengkap FROM USERS u JOIN PROFILE p ON u.id_profile = p.id_profile', (err, results) => {
-                if (err) return reject(err);
+            console.log('userModel: findAll - Executing DB query for all users.'); // LOG BARU
+            db.query('SELECT u.id_user, u.username, u.email, u.id_level_user, u.id_status_valid, p.nama_lengkap, p.jenis_kelamin, p.tanggal_lahir FROM USERS u LEFT JOIN PROFILE p ON u.id_profile = p.id_profile', (err, results) => { // Pastikan Anda sudah menggunakan LEFT JOIN di sini
+                console.log('userModel: findAll - DB query callback received!'); // LOG BARU
+                
+ if (err) {
+                    console.error('userModel: findAll - Error in DB query:', err); // LOG BARU
+                    return reject(err);
+                }
+                console.log('userModel: findAll - DB query results (raw):', results); // LOG BARU
+                console.log('userModel: findAll - DB query results length:', results ? results.length : 0); // LOG BARU
                 resolve(results);
             });
         });

@@ -5,10 +5,14 @@ const authController = require('../controllers/authController'); // Untuk regist
 const { protect, authorizeRoles } = require('../middleware/authMiddleware'); // Import middleware otentikasi/otorisasi
 const userController = require('../controllers/userController'); // Untuk operasi user management
 
-// Hapus: const isAdmin = (req, res, next) => { ... };
-// Middleware `isAdmin` yang Anda buat sebelumnya tidak digunakan dan tidak diperlukan
-// karena fungsionalitasnya sudah dicakup oleh `protect` dan `authorizeRoles`.
-
+// Middleware untuk melindungi route ini (isAdmin)
+const isAdmin = (req, res, next) => {
+    if (req.user && req.user.id_level_user === 1) {
+        next();
+    } else {
+        return res.status(403).json({ message: 'Akses ditolak. Anda bukan Admin.' });
+    }
+};
 // --- Route untuk Halaman Admin (GET requests) ---
 // Ini adalah route yang melayani halaman EJS, bukan API.
 // Jika Anda ingin melindungi akses ke halaman EJS ini sendiri, tambahkan `protect` dan `authorizeRoles`.
@@ -40,8 +44,10 @@ console.log('AdminRoutes: Registered POST /admin/users');
 
 // PUT /admin/users/:id
 // Mengedit data pengguna berdasarkan ID
-router.put('/admin/users/:id', protect, authorizeRoles([1]), userController.updateUser);
+router.get('/admin/users/:id', protect, authorizeRoles([1]), userController.getUserById);
 console.log('AdminRoutes: Registered PUT /admin/users/:id');
+
+router.put('/admin/users/:id', protect, authorizeRoles([1]), userController.updateUser);
 
 // DELETE /admin/users/:id
 // Menghapus atau menonaktifkan pengguna berdasarkan ID

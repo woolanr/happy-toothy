@@ -103,22 +103,12 @@ const userController = {
 
         try {
             // Cek username dan email
-            const existingUserByUsername = await new Promise((resolve, reject) => {
-                User.findByUsername(username, (err, users) => {
-                    if (err) return reject(err);
-                    resolve(users);
-                });
-            });
+            const existingUserByUsername = await User.findByUsername(username);
             if (existingUserByUsername.length > 0) {
                 return res.status(409).json({ message: 'Username sudah terdaftar.' });
             }
 
-            const existingUserByEmail = await new Promise((resolve, reject) => {
-                User.findByEmail(email, (err, users) => {
-                    if (err) return reject(err);
-                    resolve(users);
-                });
-            });
+            const existingUserByEmail = await User.findByEmail(email);
             if (existingUserByEmail.length > 0) {
                 return res.status(409).json({ message: 'Email sudah terdaftar.' });
             }
@@ -126,32 +116,32 @@ const userController = {
             // Hash password
             const hashedPassword = await bcrypt.hash(password, 10);
 
-            // Tentukan status validasi (admin bisa langsung validasi)
-            const id_status_valid = (id_level_user === 1) ? 1 : 2; // Jika admin nambah admin lain, langsung valid
+            // Tentukan status validasi (admin bisa langsung validasi untuk admin, lainnya perlu verifikasi)
+            // Asumsi id_level_user dari frontend sudah berupa angka
+            const statusValid = (parseInt(id_level_user) === 1) ? 1 : 2; // Langsung valid (1) jika admin, belum valid (2) jika bukan
 
             const newUser = {
                 username,
                 email,
                 password: hashedPassword,
-                id_profile: null,
-                id_level_user,
-                id_status_valid
+                id_profile: null, // Akan diisi setelah membuat profile
+                id_level_user: parseInt(id_level_user), // Pastikan ini integer
+                id_status_valid: statusValid
             };
 
-            const userCreationResult = await new Promise((resolve, reject) => {
-                User.createUser(newUser, (err, result) => {
-                    if (err) return reject(err);
-                    resolve(result);
-                });
-            });
+            // Simpan user baru ke database USERS
+            const userCreationResult = await User.createUser(newUser);
             const newUserId = userCreationResult.insertId;
 
+            // Buat data profile
             const newProfile = {
                 nama_lengkap,
-                email
-                // Tambahkan kolom lain dari tabel PROFILE jika perlu
+                email // Jika ada kolom lain di PROFILE, tambahkan di sini
+                // jenis_kelamin: req.body.jenis_kelamin || null, // Contoh: jika ada dari form
+                // tanggal_lahir: req.body.tanggal_lahir || null // Contoh: jika ada dari form
             };
 
+            // Simpan profile baru ke database PROFILE
             const profileCreationResult = await new Promise((resolve, reject) => {
                 db.query('INSERT INTO PROFILE SET ?', newProfile, (err, result) => {
                     if (err) return reject(err);
@@ -160,6 +150,7 @@ const userController = {
             });
             const newProfileId = profileCreationResult.insertId;
 
+            // Update id_profile di tabel USERS
             await new Promise((resolve, reject) => {
                 db.query('UPDATE USERS SET id_profile = ? WHERE id_user = ?', [newProfileId, newUserId], (err, result) => {
                     if (err) return reject(err);
@@ -170,8 +161,27 @@ const userController = {
             res.status(201).json({ message: 'Pengguna berhasil ditambahkan.' });
 
         } catch (error) {
-            console.error('Error adding user by admin:', error);
+            console.error('userController: Error adding user by admin:', error);
             res.status(500).json({ message: 'Terjadi kesalahan saat menambahkan pengguna.' });
+        }
+    },
+
+    getUserById: async (req, res) => {
+        try {
+            const { id } = req.params; // Ambil ID dari URL parameter
+
+            // Pastikan User.findById ada di userModel.js dan mengembalikan Promise
+            const users = await User.findById(id);
+
+            if (users.length === 0) {
+                // Jika user tidak ditemukan dengan ID tersebut
+                return res.status(404).json({ message: 'Pengguna tidak ditemukan.' });
+            }
+            // Mengembalikan objek user pertama (karena ID harus unik)
+            res.status(200).json({ users: users[0] }); // <-- PASTIKAN MENGIRIM OBJEK, BUKAN ARRAY
+        } catch (error) {
+            console.error('userController: Error getting user by ID:', error);
+            res.status(500).json({ message: 'Terjadi kesalahan saat mengambil data pengguna untuk diedit.' });
         }
     },
 
@@ -235,32 +245,19 @@ const userController = {
     // Fungsi untuk menghapus (atau menonaktifkan) pengguna
     deleteUser: async (req, res) => {
         const { id } = req.params; // ID pengguna yang akan dihapus
-
         try {
-            // Implementasi deleteUser di userModel.js atau update status menjadi 'keluar'
-            // Contoh: Mengubah id_status_valid menjadi 3 (keluar)
-            await new Promise((resolve, reject) => {
-                User.updateStatusValid(id, 3, (err) => { // Menggunakan id_status_valid=3 untuk "keluar"
-                    if (err) return reject(err);
-                    resolve();
-                });
-            });
-
+            // Pastikan User.updateStatusValid ada dan mengembalikan Promise
+            await User.updateStatusValid(id, 3); // Soft delete
+            // Pastikan ini adalah SATU-SATUNYA respons sukses
             res.status(200).json({ message: 'Pengguna berhasil dinonaktifkan (status keluar).' });
-            // Atau jika benar-benar ingin hapus:
-            // await new Promise((resolve, reject) => {
-            //     User.deleteUser(id, (err) => { // Perlu implementasi deleteUser di userModel.js
-            //         if (err) return reject(err);
-            //         resolve();
-            //     });
-            // });
-            // res.status(200).json({ message: 'Pengguna berhasil dihapus.' });
-
         } catch (error) {
-            console.error('Error deleting user:', error);
-            res.status(500).json({ message: 'Terjadi kesalahan saat menghapus pengguna.' });
+            console.error('userController: Error deleting user:', error);
+            // Pastikan ini adalah SATU-SATUNYA respons error
+            if (!res.headersSent) {
+                res.status(500).json({ message: 'Terjadi kesalahan saat menghapus pengguna.' });
+            }
         }
-    }
-};
+    },
+}
 
 module.exports = userController;

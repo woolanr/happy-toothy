@@ -483,19 +483,21 @@ function createEditUserModal(user) {
 async function handleEditUser(event) {
     const userId = event.target.dataset.id;
     try {
-         // Ambil data user spesifik untuk diedit
-        const response = await fetch(`/admin/users/${userId}`, {
+        const response = await fetch(`/admin/users/${userId}`, { // Path sudah benar
             method: 'GET',
             headers: getAuthHeaders()
         });
         const result = await response.json();
 
-         if (response.ok && result.users && result.users.length > 0) {
-            createEditUserModal(result.users[0]); // Tampilkan modal dengan data user
+        // Penting: result.users adalah objek user sekarang (karena backend mengirim users: userObject)
+        if (response.ok && result.users) { // Periksa result.users (objek user)
+            createEditUserModal(result.users); // <<<-- KIRIM OBJEK USER KE MODAL
         } else if (response.status === 401 || response.status === 403) {
             alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
             localStorage.removeItem('token');
             window.location.href = '/login';
+        } else if (response.status === 404) {
+            alert('Pengguna tidak ditemukan.');
         } else {
             alert(result.message || 'Gagal memuat data pengguna untuk diedit.');
         }
@@ -603,7 +605,8 @@ async function handleVerifyUser(event) {
 // --- Event listener utama untuk DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('script.js (DOMContentLoaded): DOM fully loaded and parsed.');
-    // --- Event Listeners untuk Formulir Login/Registrasi (dari script.js asli) ---
+
+    // --- Inisialisasi Event Listeners untuk Formulir ---
     const loginForm = document.querySelector('#loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', handleLoginFormSubmit);
@@ -634,6 +637,49 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('Frontend: Reset password form event listener added.');
     }
 
+    // --- BAGIAN KODE UNTUK FORM "TAMBAH PENGGUNA BARU" ADA DI SINI ---
+    // Karena ini adalah bagian dari dashboard admin, maka harus berada di dalam
+    // event listener DOMContentLoaded dan di bagian yang relevan dengan dashboard admin.
+    const addUserForm = document.getElementById('addUserForm'); // <--- Pindah ke sini
+    if (addUserForm) { // Pastikan elemen form ada di halaman (yaitu di dashboard admin)
+        addUserForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = event.target;
+            const userData = {
+                nama_lengkap: form.addUser_nama_lengkap.value,
+                email: form.addUser_email.value,
+                username: form.addUser_username.value,
+                password: form.addUser_password.value,
+                id_level_user: parseInt(form.addUser_id_level_user.value)
+            };
+
+            try {
+                const response = await fetch('/admin/users', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(userData)
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(result.message);
+                    form.reset();
+                    fetchUsers();
+                } else if (response.status === 401 || response.status === 403) {
+                    alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
+                    localStorage.removeItem('token');
+                    window.location.href = '/login';
+                } else {
+                    alert(result.message || 'Gagal menambahkan pengguna.');
+                }
+            } catch (error) {
+                console.error('script.js (addUserForm): Error adding user:', error);
+                alert('Terjadi kesalahan saat menambahkan pengguna.');
+            }
+        });
+    }
+    // --- AKHIR BAGIAN KODE UNTUK FORM "TAMBAH PENGGUNA BARU" ---
+
     // --- Fungsi Logout ---
     const logoutButton = document.getElementById('logoutButton');
     if (logoutButton) {
@@ -643,10 +689,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.href = '/login';
         });
     }
-    
+
     // --- Panggilan Fungsi Dashboard/User Management ---
     const currentPath = window.location.pathname;
 
+    // Hanya jalankan logika fetch data dashboard/users jika berada di halaman admin dashboard
     if (currentPath === '/admin/dashboard') {
         console.log('script.js (DOMContentLoaded): On admin dashboard page. Attempting to fetch data.');
         const token = getToken();
@@ -658,7 +705,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         
-        // Panggil fungsi-fungsi fetch data admin hanya jika token ada dan ini adalah halaman admin dashboard
         fetchDashboardData();
         fetchUsers();
     } else {
