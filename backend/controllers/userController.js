@@ -263,17 +263,7 @@ const userController = {
         try {
             // req.user akan berisi data user yang login dari JWT (disetel oleh protect middleware)
             const loggedInUser = req.user; 
-            
-            if (!loggedInUser || loggedInUser.id_level_user !== 4) { // id_level_user 4 untuk Pasien
-                // Ini seharusnya sudah dicek oleh authorizeRoles, tapi sebagai validasi tambahan
-                return res.status(403).json({ message: 'Akses ditolak. Anda bukan pasien.' });
-            }
-
-            // Ambil data profil lengkap pasien dari database
             const userProfile = await User.findById(loggedInUser.id_user); // User.findById sudah mengambil JOIN PROFILE
-            if (!userProfile) { // Jika user tidak ditemukan meskipun token valid
-                return res.status(404).json({ message: 'Data pasien tidak ditemukan.' });
-            }
 
             // Hitung usia
             let usia = null;
@@ -304,8 +294,8 @@ const userController = {
                     no_telepon: userProfile.no_telepon || '-',
                     alamat: userProfile.alamat || '-'
                 },
-                upcomingAppointments: upcomingAppointments,
-                visitHistory: visitHistory
+                upcomingAppointments: [],
+                visitHistory: []
             });
 
         } catch (error) {

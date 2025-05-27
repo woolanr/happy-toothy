@@ -418,7 +418,7 @@ async function fetchUsers() {
     }
 }
 
-// --- FUNGSI BARU UNTUK MEMBUAT DAN MENAMPILKAN MODAL EDIT ---
+// --- FUNGSI MANAJEMEN CRUD PENGGUNA  ---
 function createEditUserModal(user) {
     const modal = document.createElement('div');
     modal.id = 'editUserModal';
@@ -602,6 +602,64 @@ async function handleVerifyUser(event) {
     }
 }
 
+async function fetchPatientDashboardData() {
+    try {
+        console.log('script.js (fetchPatientDashboardData): Fetching patient dashboard data...');
+        const response = await fetch('/pasien/dashboard-data', {
+            method: 'GET',
+            headers: getAuthHeaders() // Gunakan header otentikasi
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            const userProfile = data.userProfile;
+            console.log('script.js (fetchPatientDashboardData): Patient profile data received:', userProfile);
+
+            // Perbarui elemen HTML dengan data dari backend
+            document.getElementById('patientUsername').textContent = userProfile.username || '-';
+            document.getElementById('patientNamaLengkap').textContent = userProfile.nama_lengkap || '-';
+            document.getElementById('patientEmail').textContent = userProfile.email || '-';
+            document.getElementById('patientJenisKelamin').textContent = userProfile.jenis_kelamin || '-';
+            document.getElementById('patientUsia').textContent = userProfile.usia || '-';
+            document.getElementById('patientNoTelepon').textContent = userProfile.no_telepon || '-';
+            document.getElementById('patientAlamat').textContent = userProfile.alamat || '-';
+
+            // TODO: Isi janji temu mendatang dan riwayat kunjungan
+            const upcomingAppointmentsList = document.getElementById('upcomingAppointments');
+            if (upcomingAppointmentsList) {
+                if (data.upcomingAppointments && data.upcomingAppointments.length > 0) {
+                    upcomingAppointmentsList.innerHTML = data.upcomingAppointments.map(app =>
+                        `<li class="appointment-item">${app.date} - ${app.time} dengan Dr. ${app.doctor}</li>`
+                    ).join('');
+                } else {
+                    upcomingAppointmentsList.innerHTML = `<li class="appointment-item">Tidak ada janji temu mendatang.</li>`;
+                }
+            }
+
+            const visitHistoryList = document.getElementById('visitHistory');
+            if (visitHistoryList) {
+                if (data.visitHistory && data.visitHistory.length > 0) {
+                    visitHistoryList.innerHTML = data.visitHistory.map(visit =>
+                        `<li class="appointment-item">${visit.date} - ${visit.description}</li>`
+                    ).join('');
+                } else {
+                    visitHistoryList.innerHTML = `<li class="appointment-item">Tidak ada riwayat kunjungan.</li>`;
+                }
+            }
+
+        } else if (response.status === 401 || response.status === 403) {
+            alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        } else {
+            alert(data.message || 'Gagal memuat data dashboard pasien.');
+        }
+    } catch (error) {
+        console.error('script.js (fetchPatientDashboardData): Error fetching patient dashboard data:', error);
+        alert('Terjadi kesalahan saat memuat data dashboard pasien.');
+    }
+}
+
 // --- Event listener utama untuk DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('script.js (DOMContentLoaded): DOM fully loaded and parsed.');
@@ -704,9 +762,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         fetchDashboardData();
         fetchUsers();
-    }
-
-    else if (currentPath === '/pasien/dashboard') {
+    } else if (currentPath === '/pasien/dashboard') {
         console.log('script.js (DOMContentLoaded): On patient dashboard page. Attempting to fetch data.');
         const token = getToken();
         if (!token) {
