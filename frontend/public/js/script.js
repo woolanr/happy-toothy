@@ -628,10 +628,19 @@ async function fetchPatientDashboardData() {
             const upcomingAppointmentsList = document.getElementById('upcomingAppointments');
             if (upcomingAppointmentsList) {
                 if (data.upcomingAppointments && data.upcomingAppointments.length > 0) {
+                    console.log('script.js: Populating upcoming appointments.');
                     upcomingAppointmentsList.innerHTML = data.upcomingAppointments.map(app =>
-                        `<li class="appointment-item">${app.date} - ${app.time} dengan Dr. ${app.doctor}</li>`
-                    ).join('');
+                        `<li class="appointment-item">
+                        <div>
+                        <strong>${new Date(app.tanggal_janji).toLocaleDateString()} ${app.waktu_janji}</strong><br>
+                        Dr. ${app.doctor_name} (${app.spesialisasi})<br>
+                        Layanan: ${app.nama_layanan}<br>
+                        Status: ${app.status_janji} 
+                        </div>
+                        </li>`
+                        ).join('');
                 } else {
+                    console.log('script.js: No upcoming appointments found.');
                     upcomingAppointmentsList.innerHTML = `<li class="appointment-item">Tidak ada janji temu mendatang.</li>`;
                 }
             }
@@ -639,8 +648,16 @@ async function fetchPatientDashboardData() {
             const visitHistoryList = document.getElementById('visitHistory');
             if (visitHistoryList) {
                 if (data.visitHistory && data.visitHistory.length > 0) {
+                    console.log('script.js: Populating visit history.');
                     visitHistoryList.innerHTML = data.visitHistory.map(visit =>
-                        `<li class="appointment-item">${visit.date} - ${visit.description}</li>`
+                        `<li class="appointment-item">
+                        <div>
+                        <strong>${new Date(visit.tanggal_janji).toLocaleDateString()} ${visit.waktu_janji}</strong><br>
+                        Dr. ${visit.doctor_name} (${visit.spesialisasi})<br>
+                        Layanan: ${visit.nama_layanan}<br>
+                        Status: ${visit.status_janji}
+                        </div>
+                        </li>`
                     ).join('');
                 } else {
                     visitHistoryList.innerHTML = `<li class="appointment-item">Tidak ada riwayat kunjungan.</li>`;
@@ -759,10 +776,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.href = '/login';
             return;
         }
-        
         fetchDashboardData();
         fetchUsers();
-    } else if (currentPath === '/pasien/dashboard') {
+    } 
+    else if (currentPath === '/pasien/dashboard') {
         console.log('script.js (DOMContentLoaded): On patient dashboard page. Attempting to fetch data.');
         const token = getToken();
         if (!token) {
@@ -773,8 +790,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         fetchPatientDashboardData(); // Panggil fungsi untuk dashboard pasien
-    }
-    else {
+    } else {
         console.log('script.js (DOMContentLoaded): Not on admin or patient dashboard. Skipping data fetch.');
     }
 });

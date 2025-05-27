@@ -261,9 +261,25 @@ const userController = {
 
     getPatientDashboardData: async (req, res) => {
         try {
-            // req.user akan berisi data user yang login dari JWT (disetel oleh protect middleware)
             const loggedInUser = req.user; 
-            const userProfile = await User.findById(loggedInUser.id_user); // User.findById sudah mengambil JOIN PROFILE
+            console.log('userController: getPatientDashboardData called for user:', loggedInUser.username, 'ID:', loggedInUser.id_user); // LOG BARU
+
+
+            if (!loggedInUser || loggedInUser.id_level_user !== 4) { 
+                console.log('userController: Access denied, user is not a patient.'); // LOG BARU
+                return res.status(403).json({ message: 'Akses ditolak. Anda bukan pasien.' });
+            }
+
+            const userProfileResults = await User.findById(loggedInUser.id_user);           
+            console.log('userController: User profile raw results from DB:', userProfileResults); // LOG BARU
+
+            if (!userProfileResults || userProfileResults.length === 0) { 
+                console.error('userController: Patient with ID:', loggedInUser.id_user, 'not found in database, or profile is missing.');
+                return res.status(404).json({ message: 'Data pasien tidak ditemukan.' });
+            }
+
+            const userProfile = userProfileResults[0];  
+            console.log('userController: Final userProfile object for response:', userProfile); // LOG BARU          
 
             // Hitung usia
             let usia = null;
@@ -277,10 +293,9 @@ const userController = {
                 }
             }
 
-            // TODO: Ambil data janji temu mendatang dan riwayat kunjungan dari database
-            // Ini akan memerlukan tabel baru (misalnya APPOINTMENTS, VISITS)
-            const upcomingAppointments = []; // Placeholder
-            const visitHistory = []; // Placeholder
+            // --- FUNGSI UNTUK MENGAMBIL JANJI TEMU DAN RIWAYAT KUNJUNGAN ---
+            const upcomingAppointments = await User.findUpcomingAppointmentsByPatientId(loggedInUser.id_user);
+            const visitHistory = await User.findPastAppointmentsByPatientId(loggedInUser.id_user);
 
             res.status(200).json({
                 message: 'Selamat datang di Dashboard Pasien!',
@@ -294,15 +309,16 @@ const userController = {
                     no_telepon: userProfile.no_telepon || '-',
                     alamat: userProfile.alamat || '-'
                 },
-                upcomingAppointments: [],
-                visitHistory: []
+                upcomingAppointments: upcomingAppointments,
+                visitHistory: visitHistory
             });
+            console.log('userController: Sent patient dashboard data response.'); // LOG BARU
 
         } catch (error) {
             console.error('userController: Error getting patient dashboard data:', error);
             res.status(500).json({ message: 'Terjadi kesalahan saat memuat data dashboard pasien.' });
         }
     }
-}
+};
 
 module.exports = userController;
