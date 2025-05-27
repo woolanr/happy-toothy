@@ -637,9 +637,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('Frontend: Reset password form event listener added.');
     }
 
-    // --- BAGIAN KODE UNTUK FORM "TAMBAH PENGGUNA BARU" ADA DI SINI ---
-    // Karena ini adalah bagian dari dashboard admin, maka harus berada di dalam
-    // event listener DOMContentLoaded dan di bagian yang relevan dengan dashboard admin.
     const addUserForm = document.getElementById('addUserForm'); // <--- Pindah ke sini
     if (addUserForm) { // Pastikan elemen form ada di halaman (yaitu di dashboard admin)
         addUserForm.addEventListener('submit', async (event) => {
@@ -707,8 +704,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         fetchDashboardData();
         fetchUsers();
-    } else {
-        console.log('script.js (DOMContentLoaded): Not on admin dashboard. Skipping data fetch.');
+    }
+
+    else if (currentPath === '/pasien/dashboard') {
+        console.log('script.js (DOMContentLoaded): On patient dashboard page. Attempting to fetch data.');
+        const token = getToken();
+        if (!token) {
+            console.warn('script.js (DOMContentLoaded): No token found for patient dashboard. Redirecting to login.');
+            alert('Sesi Anda telah berakhir atau Anda belum login. Silakan login kembali.');
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+            return;
+        }
+        fetchPatientDashboardData(); // Panggil fungsi untuk dashboard pasien
+    }
+    else {
+        console.log('script.js (DOMContentLoaded): Not on admin or patient dashboard. Skipping data fetch.');
     }
 });
     // Jika ada halaman dashboard lain (dokter, staff, pasien) yang juga perlu data terautentikasi,

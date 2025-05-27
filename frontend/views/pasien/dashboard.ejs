@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Pasien - Happy Toothy</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        /* Anda bisa menambahkan CSS khusus untuk dashboard pasien di sini atau ke style.css */
+        .patient-info, .appointments-section {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .patient-info h3, .appointments-section h3 {
+            color: #007bff;
+            margin-bottom: 15px;
+        }
+        .info-item {
+            margin-bottom: 10px;
+        }
+        .info-item strong {
+            display: inline-block;
+            width: 120px; /* Lebar label */
+        }
+        .appointment-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .appointment-item {
+            background-color: #e9f5ff;
+            border: 1px solid #cce5ff;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .appointment-item:last-child {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard Pasien</h1>
+        <p>Halo, <span id="patientUsername">Pasien!</span></p>
+        <button id="logoutButton">Logout</button>
+
+        <div class="patient-info">
+            <h3>Informasi Profil</h3>
+            <div class="info-item"><strong>Nama Lengkap:</strong> <span id="patientNamaLengkap">-</span></div>
+            <div class="info-item"><strong>Email:</strong> <span id="patientEmail">-</span></div>
+            <div class="info-item"><strong>Jenis Kelamin:</strong> <span id="patientJenisKelamin">-</span></div>
+            <div class="info-item"><strong>Usia:</strong> <span id="patientUsia">-</span> Tahun</div>
+            <div class="info-item"><strong>Nomor Telepon:</strong> <span id="patientNoTelepon">-</span></div>
+            <div class="info-item"><strong>Alamat:</strong> <span id="patientAlamat">-</span></div>
+        </div>
+
+        <div class="appointments-section">
+            <h3>Janji Temu Mendatang</h3>
+            <ul id="upcomingAppointments" class="appointment-list">
+                <li class="appointment-item">Tidak ada janji temu mendatang.</li>
+            </ul>
+            <button style="margin-top: 15px;">Buat Janji Temu Baru</button>
+        </div>
+
+        <div class="appointments-section">
+            <h3>Riwayat Kunjungan</h3>
+            <ul id="visitHistory" class="appointment-list">
+                <li class="appointment-item">Tidak ada riwayat kunjungan.</li>
+            </ul>
+        </div>
+
+    </div>
+    <script src="/js/script.js"></script> </body>
+</html>
