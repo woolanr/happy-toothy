@@ -677,6 +677,140 @@ async function fetchPatientDashboardData() {
     }
 }
 
+// Memuat data dokter dan layanan ke dropdown
+async function loadBookingFormData() {
+    try {
+        console.log('script.js: Loading booking form data (doctors and services)...');
+        const response = await fetch('/booking/form-data', {
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            const doctorSelect = document.getElementById('doctorSelect');
+            const serviceSelect = document.getElementById('serviceSelect');
+
+            if (doctorSelect) {
+            doctorSelect.innerHTML = '<option value="">Pilih Dokter</option>';
+            data.doctors.forEach(doctor => {
+                const option = document.createElement('option');
+                option.value = doctor.id_doctor;
+                option.textContent = `Dr. ${doctor.nama_lengkap} (${doctor.spesialisasi})`;
+                doctorSelect.appendChild(option);
+            });
+        }
+
+        if (serviceSelect) {
+            serviceSelect.innerHTML = '<option value="">Pilih Layanan</option>';
+            data.services.forEach(service => {
+                const option = document.createElement('option');
+                option.value = service.id_service;
+                option.textContent = `${service.nama_layanan} (${service.durasi_menit} menit)`;
+                serviceSelect.appendChild(option);
+            });
+        }    
+        console.log('script.js: Doctors and services loaded.');
+        } else {
+            alert(data.message || 'Gagal memuat pilihan dokter dan layanan.');
+        }
+    } catch (error) {
+        console.error('script.js: Error loading booking form data:', error);
+        alert('Terjadi kesalahan saat memuat pilihan booking.');
+    }
+}
+
+// Memuat jadwal kosong dokter berdasarkan dokter dan tanggal
+async function loadAvailableDoctorSlots() {
+    const doctorId = document.getElementById('doctorSelect').value;
+    const date = document.getElementById('appointmentDate').value;
+    const appointmentTimeSelect = document.getElementById('appointmentTime');
+    
+    appointmentTimeSelect.innerHTML = '<option value="">Memuat slot...</option>'; // Placeholder
+
+    if (!doctorId || !date) {
+        appointmentTimeSelect.innerHTML = '<option value="">Pilih tanggal dan dokter...</option>';
+        return;
+    }
+
+    try {
+        console.log(`script.js: Loading available slots for doctor ${doctorId} on ${date}...`);
+        const response = await fetch(`/booking/available-slots?id_doctor=${doctorId}&date=${date}`, {
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            appointmentTimeSelect.innerHTML = '<option value="">Pilih Waktu</option>';
+            if (data.schedules && data.schedules.length > 0) {
+                data.schedules.forEach(schedule => {
+                    // Anda mungkin perlu memecah slot jadwal menjadi interval durasi layanan di sini
+                    // Contoh sederhana: hanya menampilkan waktu mulai jadwal
+                    const option = document.createElement('option');
+                    option.value = schedule.waktu_mulai; // Format HH:MM:SS
+                    option.textContent = `${schedule.waktu_mulai.substring(0, 5)} - ${schedule.waktu_selesai.substring(0, 5)}`;
+                    appointmentTimeSelect.appendChild(option);
+                });
+                console.log(`script.js: ${data.schedules.length} slots loaded.`);
+            } else {
+                appointmentTimeSelect.innerHTML = '<option value="">Tidak ada slot tersedia</option>';
+                console.log('script.js: No slots found for selected doctor and date.');
+            }
+        } else {
+            alert(data.message || 'Gagal memuat jadwal dokter.');
+        }
+    } catch (error) {
+        console.error('script.js: Error loading available doctor slots:', error);
+        alert('Terjadi kesalahan saat memuat jadwal dokter.');
+    }
+}
+
+// Menangani submit form janji temu baru
+async function handleNewAppointmentFormSubmit(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const appointmentData = {
+        id_doctor: form.doctorSelect.value,
+        id_service: form.serviceSelect.value,
+        tanggal_janji: form.appointmentDate.value,
+        waktu_janji: form.appointmentTime.value,
+        catatan_pasien: form.patientNotes.value
+    };
+
+    if (!appointmentData.id_doctor || !appointmentData.id_service || !appointmentData.tanggal_janji || !appointmentData.waktu_janji) {
+        alert('Mohon lengkapi semua pilihan janji temu.');
+        return;
+    }
+
+    try {
+        console.log('script.js: Submitting new appointment:', appointmentData);
+        const response = await fetch('/booking/create', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(appointmentData)
+        });
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(result.message);
+            form.reset(); // Reset form
+            // Muat ulang daftar janji temu mendatang
+            fetchPatientDashboardData(); // Untuk update appointments dan profile
+        } else if (response.status === 401 || response.status === 403) {
+            alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        } else {
+            alert(result.message || 'Gagal membuat janji temu.');
+        }
+    } catch (error) {
+        console.error('script.js: Error creating new appointment:', error);
+        alert('Terjadi kesalahan saat membuat janji temu.');
+    }
+}
+
 // --- Event listener utama untuk DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('script.js (DOMContentLoaded): DOM fully loaded and parsed.');
@@ -778,8 +912,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         fetchDashboardData();
         fetchUsers();
-    } 
-    else if (currentPath === '/pasien/dashboard') {
+    } else if (currentPath === '/pasien/dashboard') {
         console.log('script.js (DOMContentLoaded): On patient dashboard page. Attempting to fetch data.');
         const token = getToken();
         if (!token) {
@@ -789,11 +922,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.href = '/login';
             return;
         }
-        fetchPatientDashboardData(); // Panggil fungsi untuk dashboard pasien
+        fetchPatientDashboardData();
+
+        // --- TAMBAH INI UNTUK BOOKING ---
+        // Panggil untuk memuat dokter dan layanan saat halaman pasien dimuat
+        loadBookingFormData(); 
+
+        const doctorSelect = document.getElementById('doctorSelect');
+        const appointmentDate = document.getElementById('appointmentDate');
+        const newAppointmentForm = document.getElementById('newAppointmentForm');
+
+        if (doctorSelect) {
+            doctorSelect.addEventListener('change', loadAvailableDoctorSlots);
+        }
+        if (appointmentDate) {
+            appointmentDate.addEventListener('change', loadAvailableDoctorSlots);
+            // Set tanggal minimum hari ini
+            appointmentDate.min = new Date().toISOString().split('T')[0];
+        }
+        if (newAppointmentForm) {
+            newAppointmentForm.addEventListener('submit', handleNewAppointmentFormSubmit);
+        }
+        // --- AKHIR PENAMBAHAN UNTUK BOOKING ---
     } else {
         console.log('script.js (DOMContentLoaded): Not on admin or patient dashboard. Skipping data fetch.');
     }
 });
+
     // Jika ada halaman dashboard lain (dokter, staff, pasien) yang juga perlu data terautentikasi,
     // Anda bisa menambahkan kondisi serupa di sini
     // else if (currentPath.startsWith('/dokter/dashboard')) {

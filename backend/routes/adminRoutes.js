@@ -49,6 +49,16 @@ console.log('AdminRoutes: Registered PUT /admin/users/:id'); // <<-- LOG INI UNT
 router.delete('/admin/users/:id', protect, authorizeRoles([1]), userController.deleteUser);
 console.log('AdminRoutes: Registered DELETE /admin/users/:id');
 
+// Mendapatkan daftar dokter dan layanan untuk form booking
+router.get('/booking/form-data', protect, authorizeRoles([4]), userController.getBookingFormData);
+console.log('AdminRoutes: Registered GET /booking/form-data');
+
+// Mendapatkan jadwal kosong dokter berdasarkan ID dokter dan tanggal
+router.get('/booking/available-slots', protect, authorizeRoles([4]), userController.getAvailableDoctorSlots); // Hanya pasien yang bisa akses
+
+// Membuat janji temu baru
+router.post('/booking/create', protect, authorizeRoles([4]), userController.bookAppointment); // Hanya pasien yang bisa akses
+
 // POST /admin/register (Route API untuk proses registrasi admin)
 router.post('/admin/register', protect, authorizeRoles([1]), authController.register);
 console.log('AdminRoutes: Registered POST /admin/register');

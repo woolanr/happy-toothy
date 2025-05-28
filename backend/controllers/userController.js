@@ -1,7 +1,7 @@
 // backend/controllers/userController.js
-const User = require('../models/userModel');
-const bcrypt = require('bcrypt');
-const db = require('../config/database'); // Pastikan db sudah diimpor jika diperlukan
+const User = require('../models/userModel'); // Pastikan User model sudah mengembalikan Promise
+const bcrypt = require('bcrypt'); // Diimpor tapi tidak digunakan di controller ini
+const db = require('../config/database'); // Pastikan db diimpor untuk query langsung
 
 const userController = {
     // Fungsi untuk menampilkan dashboard admin (misalnya data ringkasan)
@@ -11,14 +11,13 @@ const userController = {
 
             // Ambil data profil admin yang login untuk nama lengkap, jenis kelamin, dan usia
             const adminProfileResults = await new Promise((resolve, reject) => {
-                // Pastikan `db` di sini diakses dengan benar
                 db.query('SELECT nama_lengkap, tanggal_lahir, jenis_kelamin FROM PROFILE WHERE id_profile = (SELECT id_profile FROM USERS WHERE id_user = ?)', [loggedInUser.id_user], (err, results) => {
                     if (err) return reject(err);
                     resolve(results); // Resolve dengan seluruh array results
                 });
             });
 
-             // Periksa apakah ada hasil untuk adminProfile sebelum mengakses results[0]
+            // Periksa apakah ada hasil untuk adminProfile sebelum mengakses results[0]
             const adminProfile = adminProfileResults && adminProfileResults.length > 0 ? adminProfileResults[0] : null;
 
             // Hitung usia dari tanggal_lahir
@@ -44,6 +43,7 @@ const userController = {
                     });
                 });
             };
+
             const totalUsers = await fetchCount('SELECT COUNT(id_user) AS total FROM USERS');
             const totalDoctors = await fetchCount('SELECT COUNT(id_user) AS total FROM USERS WHERE id_level_user = 2');
             const totalPatients = await fetchCount('SELECT COUNT(id_user) AS total FROM USERS WHERE id_level_user = 4');
@@ -52,11 +52,11 @@ const userController = {
 
             res.status(200).json({
                 message: 'Selamat datang di Dashboard Admin Happy Toothy!',
-                user: { // Kirim detail user yang 
+                user: { // Kirim detail user yang login
                     id_user: loggedInUser.id_user,
                     username: loggedInUser.username,
                     id_level_user: loggedInUser.id_level_user,
-                    nama_lengkap: adminProfile ? adminProfile.nama_lengkap : 'Admin',
+                    nama_lengkap: adminProfile ? adminProfile.nama_lengkap : loggedInUser.username, // Gunakan username jika nama lengkap kosong
                     jenis_kelamin: adminProfile ? adminProfile.jenis_kelamin : '-',
                     usia: usia || '-'
                 },
@@ -76,16 +76,16 @@ const userController = {
     // Fungsi untuk mendapatkan daftar semua pengguna
     getAllUsers: async (req, res) => {
         try { 
-            console.log('userController: getAllUsers called. Fetching all users from model.'); // LOG BARU
+            console.log('userController: getAllUsers called. Fetching all users from model.');
             const users = await User.findAll(); // Ini memanggil userModel.findAll()
-            console.log('userController: getAllUsers - Users received from model:', users); // LOG BARU
-            console.log('userController: getAllUsers - Number of users received:', users ? users.length : 0); // LOG BARU
+            console.log('userController: getAllUsers - Users received from model:', users);
+            console.log('userController: getAllUsers - Number of users received:', users ? users.length : 0);
 
-            console.log('userController: getAllUsers - Sending 200 OK response with users data.'); // LOG BARU
+            console.log('userController: getAllUsers - Sending 200 OK response with users data.');
             res.status(200).json({ users: users });
-            console.log('userController: getAllUsers - Response sent.'); // LOG BARU
+            console.log('userController: getAllUsers - Response sent.');
         } catch (error) {
-            console.error('userController: getAllUsers - Error (caught by general catch):', error); // LOG BARU
+            console.error('userController: getAllUsers - Error (caught by general catch):', error);
             if (!res.headersSent) {
                 res.status(500).json({ message: 'Terjadi kesalahan server saat mengambil daftar pengguna.' });
             }
@@ -178,7 +178,7 @@ const userController = {
                 return res.status(404).json({ message: 'Pengguna tidak ditemukan.' });
             }
             // Mengembalikan objek user pertama (karena ID harus unik)
-            res.status(200).json({ users: users[0] }); // <-- PASTIKAN MENGIRIM OBJEK, BUKAN ARRAY
+            res.status(200).json({ users: users[0] }); // PASTIKAN MENGIRIM OBJEK, BUKAN ARRAY
         } catch (error) {
             console.error('userController: Error getting user by ID:', error);
             res.status(500).json({ message: 'Terjadi kesalahan saat mengambil data pengguna untuk diedit.' });
@@ -190,11 +190,11 @@ const userController = {
         const { id } = req.params; // ID pengguna yang akan diedit
         const { nama_lengkap, email, username, id_level_user, id_status_valid } = req.body;
 
-       // Validasi input
+        // Validasi input
         if (!id) {
             return res.status(400).json({ message: 'ID pengguna diperlukan untuk update.' });
         }
-        if (!nama_lengkap && !email && !username && !id_level_user && !id_status_valid) {
+        if (!nama_lengkap && !email && !username && id_level_user === undefined && id_status_valid === undefined) { // Cek undefined untuk level/status
             return res.status(400).json({ message: 'Setidaknya satu field harus diisi untuk update.' });
         }
 
@@ -261,25 +261,31 @@ const userController = {
 
     getPatientDashboardData: async (req, res) => {
         try {
+            // req.user akan berisi data user yang login dari JWT (disetel oleh protect middleware)
             const loggedInUser = req.user; 
-            console.log('userController: getPatientDashboardData called for user:', loggedInUser.username, 'ID:', loggedInUser.id_user); // LOG BARU
+            console.log('userController: getPatientDashboardData called for user:', loggedInUser.username, 'ID:', loggedInUser.id_user);
 
-
-            if (!loggedInUser || loggedInUser.id_level_user !== 4) { 
-                console.log('userController: Access denied, user is not a patient.'); // LOG BARU
+            // Pastikan req.user tersedia. Middleware 'protect' yang seharusnya mengisinya.
+            if (!loggedInUser || !loggedInUser.id_user) {
+                console.error('userController: req.user is undefined or missing id_user. Not authenticated or user data missing.');
+                return res.status(401).json({ message: 'Akses ditolak. Informasi pengguna tidak tersedia.' });
+            }
+            // Pindahkan validasi level ke sini
+            if (loggedInUser.id_level_user !== 4) { 
+                console.log('userController: Access denied, user is not a patient (id_level_user is not 4). Current level:', loggedInUser.id_level_user);
                 return res.status(403).json({ message: 'Akses ditolak. Anda bukan pasien.' });
             }
 
-            const userProfileResults = await User.findById(loggedInUser.id_user);           
-            console.log('userController: User profile raw results from DB:', userProfileResults); // LOG BARU
+            const userProfileResults = await User.findById(loggedInUser.id_user); 
+            console.log('userController: User profile raw results from DB:', userProfileResults); 
 
             if (!userProfileResults || userProfileResults.length === 0) { 
                 console.error('userController: Patient with ID:', loggedInUser.id_user, 'not found in database, or profile is missing.');
                 return res.status(404).json({ message: 'Data pasien tidak ditemukan.' });
             }
 
-            const userProfile = userProfileResults[0];  
-            console.log('userController: Final userProfile object for response:', userProfile); // LOG BARU          
+            const userProfile = userProfileResults[0]; 
+            console.log('userController: Final userProfile object for response:', userProfile); 
 
             // Hitung usia
             let usia = null;
@@ -293,13 +299,14 @@ const userController = {
                 }
             }
 
-            // --- FUNGSI UNTUK MENGAMBIL JANJI TEMU DAN RIWAYAT KUNJUNGAN ---
+            // TODO: Ambil data janji temu mendatang dan riwayat kunjungan dari database
             const upcomingAppointments = await User.findUpcomingAppointmentsByPatientId(loggedInUser.id_user);
             const visitHistory = await User.findPastAppointmentsByPatientId(loggedInUser.id_user);
+            console.log('userController: Upcoming Appointments:', upcomingAppointments.length, 'Visit History:', visitHistory.length);
 
             res.status(200).json({
                 message: 'Selamat datang di Dashboard Pasien!',
-                userProfile: { // Detail profil pasien yang login
+                userProfile: { 
                     id_user: userProfile.id_user,
                     username: userProfile.username,
                     email: userProfile.email,
@@ -312,11 +319,85 @@ const userController = {
                 upcomingAppointments: upcomingAppointments,
                 visitHistory: visitHistory
             });
-            console.log('userController: Sent patient dashboard data response.'); // LOG BARU
+            console.log('userController: Sent patient dashboard data response.'); 
 
         } catch (error) {
-            console.error('userController: Error getting patient dashboard data:', error);
+            console.error('userController: Error getting patient dashboard data (caught by general catch):', error);
+            console.error('Error Stack:', error.stack); 
             res.status(500).json({ message: 'Terjadi kesalahan saat memuat data dashboard pasien.' });
+        }
+    },
+    
+    getBookingFormData: async (req, res) => {
+        try {
+            const doctors = await User.findAllDoctors(); // Ambil semua dokter
+            const services = await User.findAllServices(); // Ambil semua layanan
+
+            res.status(200).json({
+                doctors: doctors,
+                services: services
+            });
+        } catch (error) {
+            console.error('userController: Error getting booking form data:', error);
+            res.status(500).json({ message: 'Terjadi kesalahan saat memuat data booking.' });
+        }
+    },
+
+    // --- FUNGSI BARU: MENDAPATKAN JADWAL DOKTER YANG TERSEDIA ---
+    getAvailableDoctorSlots: async (req, res) => {
+        const { id_doctor, date } = req.query; // Ambil dari query parameter (misal: ?id_doctor=1&date=2025-06-01)
+
+        if (!id_doctor || !date) {
+            return res.status(400).json({ message: 'ID dokter dan tanggal diperlukan.' });
+        }
+
+        try {
+            const schedules = await User.findAvailableDoctorSchedules(id_doctor, date);
+            res.status(200).json({ schedules: schedules });
+        } catch (error) {
+            console.error('userController: Error getting available doctor slots:', error);
+            res.status(500).json({ message: 'Terjadi kesalahan saat memuat jadwal dokter.' });
+        }
+    },
+
+    // --- FUNGSI BARU: MEMBUAT JANJI TEMU OLEH PASIEN ---
+    bookAppointment: async (req, res) => {
+        const { id_doctor, id_service, tanggal_janji, waktu_janji, catatan_pasien } = req.body;
+        const id_patient = req.user.id_user; // ID pasien dari JWT
+
+        if (!id_doctor || !id_service || !tanggal_janji || !waktu_janji) {
+            return res.status(400).json({ message: 'Dokter, layanan, tanggal, dan waktu janji diperlukan.' });
+        }
+
+        try {
+            // Validasi tambahan: Pastikan slot waktu yang dipilih masih tersedia
+            // Ini akan memanggil fungsi findAvailableDoctorSchedules lagi atau membuat yang baru
+            // Anda perlu memeriksa apakah slot yang diminta memang tersedia sebelum menyimpan
+            const availableSlots = await User.findAvailableDoctorSchedules(id_doctor, tanggal_janji);
+            const isSlotAvailable = availableSlots.some(slot => 
+                slot.waktu_mulai.slice(0, 5) === waktu_janji.slice(0, 5) // Bandingkan hanya jam dan menit
+            );
+
+            if (!isSlotAvailable) {
+                return res.status(409).json({ message: 'Slot janji temu sudah terisi atau tidak tersedia.' });
+            }
+
+            const appointmentData = {
+                id_patient,
+                id_doctor,
+                id_service,
+                tanggal_janji,
+                waktu_janji,
+                catatan_pasien: catatan_pasien || null,
+                status_janji: 'Pending' // Status awal saat booking
+            };
+
+            const result = await User.createAppointment(appointmentData);
+            res.status(201).json({ message: 'Janji temu berhasil dibuat.', id_appointment: result.insertId });
+
+        } catch (error) {
+            console.error('userController: Error booking appointment:', error);
+            res.status(500).json({ message: 'Terjadi kesalahan saat membuat janji temu.' });
         }
     }
 };

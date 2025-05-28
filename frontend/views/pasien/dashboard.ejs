@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/css/style.css">
     <style>
         /* Anda bisa menambahkan CSS khusus untuk dashboard pasien di sini atau ke style.css */
-        .patient-info, .appointments-section {
+        .patient-info, .appointments-section, .booking-section {
             background-color: #f8f9fa;
             border: 1px solid #e9ecef;
             border-radius: 8px;
@@ -15,7 +15,7 @@
             margin-top: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .patient-info h3, .appointments-section h3 {
+        .patient-info h3, .appointments-section h3, .booking-section h3 {
             color: #007bff;
             margin-bottom: 15px;
         }
@@ -43,6 +43,36 @@
         }
         .appointment-item:last-child {
             margin-bottom: 0;
+        }
+        /* CSS untuk form booking */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group select, .form-group input[type="date"], .form-group input[type="time"], .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .booking-form-buttons {
+            margin-top: 20px;
+        }
+        .booking-form-buttons button {
+            padding: 10px 15px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .booking-form-buttons button:hover {
+            background-color: #218838;
         }
     </style>
 </head>
@@ -77,6 +107,42 @@
             </ul>
         </div>
 
+        <div class="booking-section">
+            <h3>Buat Janji Temu Baru</h3>
+            <form id="newAppointmentForm">
+                <div class="form-group">
+                    <label for="doctorSelect">Pilih Dokter:</label>
+                    <select id="doctorSelect" name="id_doctor" required>
+                        <option value="">Memuat dokter...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="serviceSelect">Pilih Layanan:</label>
+                    <select id="serviceSelect" name="id_service" required>
+                        <option value="">Memuat layanan...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentDate">Tanggal Janji Temu:</label>
+                    <input type="date" id="appointmentDate" name="tanggal_janji" required>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentTime">Waktu Janji Temu:</label>
+                    <select id="appointmentTime" name="waktu_janji" required>
+                        <option value="">Pilih tanggal dan dokter...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="patientNotes">Catatan (Opsional):</label>
+                    <textarea id="patientNotes" name="catatan_pasien" rows="3"></textarea>
+                </div>
+                <div class="booking-form-buttons">
+                    <button type="submit">Konfirmasi Janji Temu</button>
+                </div>
+            </form>
+        </div>
+
     </div>
-    <script src="/js/script.js"></script> </body>
+    <script src="/js/script.js"></script>
+</body>
 </html>
