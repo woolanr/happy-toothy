@@ -64,7 +64,6 @@ const User = {
         });
     },
 
-    // --- FUNGSI UNTUK MENGAMBIL JADWAL DOKTER YANG TERSEDIA (PERBAIKAN KRITIS) ---
     findAvailableDoctorSchedules: (id_doctor, date) => {
         return new Promise((resolve, reject) => {
             console.log('userModel: findAvailableDoctorSchedules - Executing DB query.');
@@ -99,6 +98,18 @@ const User = {
                 }
                 console.log('userModel: findAvailableDoctorSchedules - DB query results (raw):', results);
                 resolve(results);
+            });
+        });
+    },
+
+    createAppointment: (appointmentData) => {
+        return new Promise((resolve, reject) => {
+            db.query('INSERT INTO APPOINTMENTS SET ?', appointmentData, (err, result) => {
+                if (err) {
+                    console.error('userModel: Error creating appointment:', err);
+                    return reject(err);
+                }
+                resolve(result);
             });
         });
     },
