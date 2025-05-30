@@ -61,6 +61,11 @@ app.get('/reset-password', (req, res) => {
     res.render('reset-password');
 });
 
+app.get('/verification', (req, res) => {
+    console.log('Serving verification page.');
+    res.render('verification', { message: req.query.message || null }); 
+});
+
 app.get('/admin/register', (req, res) => {
     console.log('Serving admin register page.');
     res.render('admin/register');

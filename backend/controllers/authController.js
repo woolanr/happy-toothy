@@ -1,179 +1,219 @@
 // backend/controllers/authController.js
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
-const User = require('../models/userModel');
-const { sendVerificationEmail } = require('../utils/email');
+const User = require('../models/userModel'); // Model yang sudah diupdate sepenuhnya
+const { sendVerificationEmail } = require('../utils/email'); 
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
-const db = require('../config/database'); 
+// const db = require('../config/database'); // Tidak perlu import db di controller jika semua via User model
 
 const authController = {
     register: async (req, res) => {
+        console.log('Register function started.');
         const { nama_lengkap, email, username, password } = req.body;
-        let id_level_user = req.body.id_level_user || 4; // Default ke 4 (Pasien) jika id_level_user tidak disediakan
+        let id_level_user = req.body.id_level_user || 4; 
 
         id_level_user = parseInt(id_level_user); 
 
-        // Validasi input dasar
         if (!nama_lengkap || !email || !username || !password) {
+            console.log('Validation failed: Missing fields.');
             return res.status(400).json({ message: 'Semua kolom harus diisi.' });
         }
-
         if (!username.trim() || !password.trim()) {
+            console.log('Validation failed: Username/password empty.');
             return res.status(400).json({ message: 'Username dan password tidak boleh kosong.' });
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            console.log('Validation failed: Invalid email format.');
+            return res.status(400).json({ message: 'Format email tidak valid.' });
         }
 
         try {
-            // Cek apakah username sudah ada
-            const existingUserByUsername = await User.findByUsername(username); // <-- Panggilan langsung
-            if (existingUserByUsername.length > 0) {
+            console.log('Checking existing username and email...');
+            const existingUserByUsername = await User.findByUsername(username); 
+            if (existingUserByUsername.length > 0) { 
+                console.log('Username already exists.');
                 return res.status(409).json({ message: 'Username sudah terdaftar.' });
             }
 
-            // Cek apakah email sudah ada
-            const existingUserByEmail = await User.findByEmail(email); // <-- Panggilan langsung
+            const existingUserByEmail = await User.findByEmail(email);
             if (existingUserByEmail.length > 0) {
+                console.log('Email already exists.');
                 return res.status(409).json({ message: 'Email sudah terdaftar.' });
             }
 
-            // Hash password
+            console.log('Hashing password...');
             const hashedPassword = await bcrypt.hash(password, 10);
 
-            // Menentukan status vaidasi awal
-            const id_status_valid = (id_level_user === 1) ? 1 : 2;
-
-            // Buat token verifikasi (hanya jika bukan admin)
+            const id_status_valid = (id_level_user === 1) ? 1 : 2; // Admin valid, lainnya not valid
             const verificationToken = (id_level_user !== 1) ? uuidv4() : null;
-
-            // Menentukan waktu kadaluarsa token verifikasi
             const verificationExpires = (id_level_user !== 1) ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
 
-            // Data pengguna baru
-            const newUser = {
+            console.log('Calling createFullUser to save user and profile...');
+            const userCreationResult = await User.createFullUser({ // PANGGIL createFullUser di sini
                 username,
                 email,
                 password: hashedPassword,
-                id_profile: null,
-                id_level_user: id_level_user,
-                id_status_valid: (id_level_user === 1) ? 1 : 2,
+                nama_lengkap, // nama_lengkap dioper ke createFullUser untuk profil
+                id_level_user,
+                id_status_valid,
                 verification_token: verificationToken,
                 verification_expires: verificationExpires
-            };
-
-            // Simpan user baru ke database
-            const userCreationResult = await User.createUser(newUser); // <-- Panggilan langsung
-            const newUserId = userCreationResult.insertId;
-
-            // Buat data profile (sesuaikan dengan tabel PROFILE Anda)
-            const newProfile = {
-                nama_lengkap,
-                email
-            };
-
-            // Simpan profile baru ke database
-            const profileCreationResult = await new Promise((resolve, reject) => {
-                db.query('INSERT INTO PROFILE SET ?', newProfile, (err, result) => {
-                    if (err) return reject(err);
-                    resolve(result);
-                });
             });
-            const newProfileId = profileCreationResult.insertId;
-            
-            // Update id_profile di tabel USERS
-            await new Promise((resolve, reject) => {
-                db.query('UPDATE USERS SET id_profile = ? WHERE id_user = ?', [newProfileId, newUserId], (err, result) => {
-                    if (err) return reject(err);
-                    resolve(result);
-                });
-            });
+            console.log('createFullUser completed. Result:', userCreationResult);
 
-            // Kirim email verifikasi (hanya jika bukan admin)
-            if (id_level_user !== 1) {
-                sendVerificationEmail(email, verificationToken);
-                return res.status(201).json({ message: 'Registrasi berhasil. Silakan periksa email Anda untuk verifikasi.' });
-            } else {
-                return res.status(201).json({ message: 'Registrasi admin berhasil.' });
+            if (id_level_user !== 1) { // Jika bukan admin, kirim email dan render halaman verifikasi
+                console.log('Sending verification email...');
+                sendVerificationEmail(email, verificationToken, 'verification'); 
+                console.log('Email sent. Rendering verification page...');
+                // INI PERUBAHAN KRITIS: Menggunakan res.render() untuk menampilkan halaman EJS
+                return res.render('verification', { message: 'Registrasi berhasil! Silakan periksa email Anda untuk verifikasi.' });
+            } else { // Jika admin, langsung respons JSON
+                console.log('Admin registration successful. Sending JSON response.');
+                return res.status(201).json({ 
+                    message: 'Registrasi admin berhasil.', 
+                    user: { 
+                        id_user: userCreationResult.newUserId, 
+                        username, 
+                        id_level_user 
+                    } 
+                });
             }
 
         } catch (error) {
-            console.error('Error during registration:', error);
-            res.status(500).json({ message: 'Terjadi kesalahan server.' });
+            console.error('Error during registration (caught by try...catch):', error);
+            if (error.code === 'ER_DUP_ENTRY') { 
+                return res.status(409).json({ message: 'Username atau email sudah terdaftar.' });
+            }
+            res.status(500).json({ message: 'Terjadi kesalahan server saat registrasi.' });
         }
     },
 
     verifyEmail: async (req, res) => {
+        console.log('Verify email function started for token:', req.params.token);
         const { token } = req.params;
 
         if (!token) {
-            return res.status(400).send('Token verifikasi diperlukan.');
+            console.log('Verification failed: Token not found.');
+            return res.status(400).render('verification', { message: 'Token verifikasi tidak ditemukan.' });
         }
 
         try {
-            const users = await User.findByVerificationToken(token); // <-- Panggilan langsung
+            const users = await User.findByVerificationToken(token); 
 
             if (users.length === 0) {
-                return res.status(404).send('Tautan verifikasi tidak valid atau sudah kadaluarsa.');
+                console.log('Verification failed: Invalid or expired token.');
+                return res.status(404).render('verification', { message: 'Tautan verifikasi tidak valid atau sudah kadaluarsa.' });
             }
 
             const user = users[0];
+            console.log('User found for verification:', user.username);
 
-            // Update status valid menjadi 1 (valid)
+            if (user.verification_expires && new Date() > new Date(user.verification_expires)) {
+                console.log('Verification failed: Token expired.');
+                return res.status(400).render('verification', { message: 'Tautan verifikasi sudah kadaluarsa. Mohon kirim ulang email verifikasi.' });
+            }
+
+            if (user.id_status_valid === 1) {
+                console.log('User already verified. Redirecting to login.');
+                return res.redirect('/login?verified=already'); 
+            }
+
+            console.log('Updating user status to valid and clearing token...');
             await User.updateStatusValid(user.id_user, 1);
-            // Hapus token verifikasi setelah berhasil digunakan
             await User.clearVerificationToken(user.id_user);
 
-            res.send('Email Anda berhasil diverifikasi. Sekarang Anda dapat <a href="/login">login</a>.');
+            console.log('Email verified successfully. Redirecting to login.');
+            res.redirect('/login?verified=true'); 
+        
         } catch (error) {
             console.error('Error during email verification:', error);
-            res.status(500).send('Terjadi kesalahan server saat memverifikasi email.');
+            res.status(500).render('verification', { message: 'Terjadi kesalahan server saat memverifikasi email.' });
+        }
+    },
+
+    resendVerificationEmail: async (req, res) => {
+        console.log('Resend verification email request received for email:', req.body.email);
+        const { email } = req.body;
+        if (!email) {
+            console.log('Resend failed: Email not provided.');
+            return res.status(400).json({ message: 'Email tidak boleh kosong.' });
+        }
+
+        try {
+            const users = await User.findByEmail(email); 
+            if (users.length === 0) {
+                console.log('Resend: Email not found, but returning success for security.');
+                return res.status(200).json({ message: 'Jika email terdaftar, link verifikasi telah dikirim ulang.' });
+            }
+
+            const user = users[0];
+            console.log('User found for resend:', user.username);
+
+            if (user.id_status_valid === 1) { 
+                console.log('Resend: User already verified.');
+                return res.status(400).json({ message: 'Akun Anda sudah diverifikasi. Silakan login.' });
+            }
+
+            console.log('Generating new verification token for resend...');
+            const newVerificationToken = uuidv4();
+            const newVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); 
+
+            console.log('Updating verification token in DB for user:', user.id_user);
+            await User.updateVerificationToken(user.id_user, newVerificationToken, newVerificationExpires);
+
+            console.log('Sending new verification email...');
+            sendVerificationEmail(user.email, newVerificationToken, 'verification'); 
+
+            console.log('Resend verification email successful.');
+            res.status(200).json({ message: 'Link verifikasi telah berhasil dikirim ulang ke email Anda.' });
+
+        } catch (error) {
+            console.error('Error during resend verification email:', error);
+            res.status(500).json({ message: 'Terjadi kesalahan server saat memproses permintaan.' });
         }
     },
 
     login: async (req, res) => {
-        console.log('Login request received for username:', req.body.username); // Log 1
+        console.log('Login request received for username:', req.body.username); 
         
         const { username, password } = req.body;
 
         if (!username || !password) {
+            console.log('Login failed: Username/password empty.');
             return res.status(400).json({ message: 'Username dan password harus diisi.' });
         }
 
         try {
-            console.log('Fetching user from DB...'); // Log 2
-            const users = await User.findByUsername(username); // <-- Panggilan langsung
-            console.log('User fetched from DB. Users array:', users); // Log 3
-
+            console.log('Fetching user from DB...');
+            const users = await User.findByUsername(username); 
+            console.log('User fetched from DB. Users array:', users);
 
             if (users.length === 0) {
-                console.log('User not found in DB.'); // Log 4
+                console.log('Login failed: User not found.');
                 return res.status(401).json({ message: 'Username atau password salah.' });
             }
 
             const user = users[0];
-            console.log('User object fetched from DB:', user); // Log 5: Cetak objek user lengkap
-            console.log('User ID Status Valid from DB:', user.id_status_valid); // Log 6: Cetak status validasi spesifik
+            console.log('User object fetched from DB:', user.username, 'Status:', user.id_status_valid);
 
-            // Periksa status validasi (menggunakan angka 1)
             if (user.id_status_valid !== 1) { 
-                console.log('Login failed: User status is not valid (current status:', user.id_status_valid, ').'); // Log 7: Pesan lebih jelas
+                console.log('Login failed: User status is not valid (current status:', user.id_status_valid, ').');
+                if (user.id_status_valid === 3) {
+                     return res.status(403).json({ message: 'Akun Anda telah dinonaktifkan. Silakan hubungi admin.' });
+                }
                 return res.status(401).json({ message: 'Akun Anda belum diverifikasi. Silakan periksa email Anda.' });
             }
 
-            // Bandingkan password
-            console.log('Comparing password using bcrypt...'); // Log 8: Perbaiki log ini
-            console.log('Password from request:', password); // Log 9: Password dari form
-            console.log('Hashed password from DB:', user.password); // Log 10: Password hash dari DB
-            
+            console.log('Comparing password using bcrypt...');
             const isMatch = await bcrypt.compare(password, user.password);
-            console.log('Password match status (isMatch):', isMatch); // Log 11: Hasil perbandingan
-
+            console.log('Password match status (isMatch):', isMatch);
 
             if (!isMatch) {
-                console.log('Login failed: Password mismatch. Sending 401 response.'); // Log 12: Pesan lebih jelas
+                console.log('Login failed: Password mismatch.');
                 return res.status(401).json({ message: 'Username atau password salah.' });
             }
 
-            // Login Berhasil, Buat JWT
             const token = jwt.sign(
                 {
                     id_user: user.id_user,
@@ -184,11 +224,10 @@ const authController = {
                 { expiresIn: config.jwtExpiresIn }
             );
 
-            // Ini adalah respons yang akan dikirimkan
-            console.log('Login successful! Sending 200 OK response. Response.');
+            console.log('Login successful! Sending 200 OK response.');
             res.status(200).json({
                 message: 'Login berhasil!',
-                token: token, // <--- Baris ini seharusnya menambahkan token
+                token: token, 
                 user: {
                     id_user: user.id_user,
                     username: user.username,
@@ -203,9 +242,11 @@ const authController = {
     },
 
     forgotPassword: async (req, res) => {
+        console.log('Forgot password request for email:', req.body.email);
         const { email } = req.body;
 
         if (!email) {
+            console.log('Forgot password failed: Email not provided.');
             return res.status(400).json({ message: 'Email harus diisi.' });
         }
 
@@ -213,19 +254,23 @@ const authController = {
             const users = await User.findByEmail(email);
 
             if (users.length === 0) {
-                return res.status(404).json({ message: 'Email tidak terdaftar.' });
+                console.log('Forgot password: Email not found, but returning success for security.');
+                return res.status(200).json({ message: 'Jika email terdaftar, tautan reset password telah dikirim ke email Anda.' });
             }
 
             const user = users[0];
-            console.log('User object for forgot password:', user);
-           
-            const resetToken = uuidv4();
-            const resetExpires = new Date(Date.now() + 60 * 60 * 1000);
+            console.log('User found for forgot password:', user.username);
             
+            const resetToken = uuidv4();
+            const resetExpires = new Date(Date.now() + 60 * 60 * 1000); 
+
+            console.log('Saving reset token to DB...');
             await User.saveResetToken(user.id_user, resetToken, resetExpires);
 
-            sendVerificationEmail(email, resetToken, 'resetPassword');
+            console.log('Sending reset password email...');
+            sendVerificationEmail(email, resetToken, 'resetPassword'); 
 
+            console.log('Reset password link sent successfully.');
             res.status(200).json({ message: 'Tautan reset password telah dikirim ke email Anda.' });
         } catch (error) {
             console.error('Error during forgot password:', error);
@@ -234,9 +279,11 @@ const authController = {
     },
 
     resetPassword: async (req, res) => {
+        console.log('Reset password request for token.');
         const { token, newPassword } = req.body;
 
         if (!token || !newPassword) {
+            console.log('Reset password failed: Token or new password missing.');
             return res.status(400).json({ message: 'Token dan password baru harus diisi.' });
         }
 
@@ -244,16 +291,21 @@ const authController = {
             const users = await User.findByResetToken(token);
 
             if (users.length === 0) {
+                console.log('Reset password failed: Invalid or expired token.');
                 return res.status(400).json({ message: 'Token reset password tidak valid atau sudah kadaluarsa.' });
             }
 
             const user = users[0];
+            console.log('User found for reset password:', user.username);
 
+            console.log('Hashing new password...');
             const hashedPassword = await bcrypt.hash(newPassword, 10);
 
+            console.log('Updating password and clearing reset token...');
             await User.updatePassword(user.id_user, hashedPassword);
             await User.clearResetToken(user.id_user);
 
+            console.log('Password reset successfully.');
             res.status(200).json({ message: 'Password berhasil direset. Silakan login dengan password baru Anda.' });
         } catch (error) {
             console.error('Error resetting password:', error);

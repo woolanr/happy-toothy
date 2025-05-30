@@ -129,7 +129,7 @@ async function handleRegisterFormSubmit(event) {
 
     try {
         console.log('Frontend: Sending user registration request.');
-        const response = await fetch('/register', { // Endpoint backend untuk registrasi
+        const response = await fetch('/register', { 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -142,19 +142,56 @@ async function handleRegisterFormSubmit(event) {
                 id_level_user: id_level_user
             })
         });
+        
+        const contentType = response.headers.get('content-type');
+        if (response.ok && contentType && contentType.includes('text/html')) {
+            window.location.href = '/verification';
+            console.log('Frontend: Redirecting to verification page.');
+        } else if (response.ok && contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            alert(data.message);
+            if (data.user && data.user.id_level_user === 1) { // Hanya untuk admin
+                window.location.href = '/admin/dashboard';
+            }
+        } else {
+            const errorMessage = await response.text(); // Coba baca sebagai teks
+            console.error('Frontend: Registration failed with status', response.status, 'and message:', errorMessage);
+            alert(`Terjadi kesalahan saat registrasi: ${response.status} - ${errorMessage.substring(0, 100)}...`);
+        }
+
+    } catch (error) {
+        console.error('Frontend: Registration network or unexpected error:', error);
+        alert('Terjadi masalah koneksi atau server tidak merespons. Mohon coba lagi.');
+    }
+}
+
+// --- FUNGSI UNTUK KIRIM ULANG EMAIL VERIFIKASI ---
+async function handleResendVerificationEmail(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const email = form.email.value;
+
+    try {
+        console.log('Frontend: Sending resend verification email request for:', email);
+        const response = await fetch('/resend-verification', { // Ini adalah endpoint backend yang baru
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
 
         const data = await response.json();
-        console.log('Frontend: User registration response:', data);
+        console.log('Frontend: Resend verification email response:', data);
 
         if (response.ok) {
-            alert(data.message);
-            window.location.href = '/login';
+            alert(data.message || 'Email verifikasi telah berhasil dikirim ulang. Silakan cek kotak masuk Anda.');
+            form.reset(); // Kosongkan form setelah sukses
         } else {
-            alert(data.message);
+            alert(data.message || 'Gagal mengirim ulang email verifikasi. Mohon coba lagi.');
         }
     } catch (error) {
-        console.error('Frontend: Registration error:', error);
-        alert('Terjadi kesalahan saat registrasi.');
+        console.error('Frontend: Error resending verification email:', error);
+        alert('Terjadi kesalahan saat mengirim ulang email verifikasi.');
     }
 }
 
@@ -184,7 +221,7 @@ function performRedirect(userData) {
     }
 }
 
-// --- FUNGSI BARU UNTUK LUPA PASSWORD ---
+// --- FUNGSI UNTUK LUPA PASSWORD ---
 async function handleForgotPasswordFormSubmit(event) {
     event.preventDefault();
 
@@ -213,7 +250,7 @@ async function handleForgotPasswordFormSubmit(event) {
     }
 }
 
-// --- FUNGSI BARU UNTUK RESET PASSWORD ---
+// --- FUNGSI UNTUK RESET PASSWORD ---
 async function handleResetPasswordFormSubmit(event) {
     event.preventDefault();
 
@@ -254,37 +291,6 @@ async function handleResetPasswordFormSubmit(event) {
         console.error('Frontend: Reset password error:', error);
         alert('Terjadi kesalahan saat mereset password.');
     }
-}
-
-// --- Event Listeners untuk Formulir ---
-const loginForm = document.querySelector('#loginForm');
-if (loginForm) {
-    loginForm.addEventListener('submit', handleLoginFormSubmit);
-    console.log('Frontend: Login form event listener added.');
-}
-
-const adminRegisterForm = document.querySelector('#adminRegisterForm');
-if (adminRegisterForm) {
-    adminRegisterForm.addEventListener('submit', handleAdminRegisterFormSubmit);
-    console.log('Frontend: Admin Register form event listener added.');
-}
-
-const registerForm = document.querySelector('#registerForm');
-if (registerForm) {
-    registerForm.addEventListener('submit', handleRegisterFormSubmit);
-    console.log('Frontend: User Register form event listener added.');
-}
-
-const forgotPasswordForm = document.querySelector('#forgotPasswordForm');
-if (forgotPasswordForm) {
-    forgotPasswordForm.addEventListener('submit', handleForgotPasswordFormSubmit);
-    console.log('Frontend: Forgot password form event listener added.');
-}
-
-const resetPasswordForm = document.querySelector('#resetPasswordForm');
-if (resetPasswordForm) {
-    resetPasswordForm.addEventListener('submit', handleResetPasswordFormSubmit);
-    console.log('Frontend: Reset password form event listener added.');
 }
 
 // --- Fungsi Logout ---
@@ -418,7 +424,7 @@ async function fetchUsers() {
     }
 }
 
-// --- FUNGSI MANAJEMEN CRUD PENGGUNA  ---
+// --- FUNGSI MANAJEMEN CRUD PENGGUNA  ---
 function createEditUserModal(user) {
     const modal = document.createElement('div');
     modal.id = 'editUserModal';
@@ -468,7 +474,7 @@ function createEditUserModal(user) {
         </div>
     `;
 
-     document.body.appendChild(modal);
+    document.body.appendChild(modal);
 
     // Event listener untuk tombol Batal
     document.getElementById('closeModalBtn').addEventListener('click', () => {
@@ -615,16 +621,23 @@ async function fetchPatientDashboardData() {
             const userProfile = data.userProfile;
             console.log('script.js (fetchPatientDashboardData): Patient profile data received:', userProfile);
 
-            // Perbarui elemen HTML dengan data dari backend
-            document.getElementById('patientUsername').textContent = userProfile.username || '-';
-            document.getElementById('patientNamaLengkap').textContent = userProfile.nama_lengkap || '-';
-            document.getElementById('patientEmail').textContent = userProfile.email || '-';
-            document.getElementById('patientJenisKelamin').textContent = userProfile.jenis_kelamin || '-';
-            document.getElementById('patientUsia').textContent = userProfile.usia || '-';
-            document.getElementById('patientNoTelepon').textContent = userProfile.no_telepon || '-';
-            document.getElementById('patientAlamat').textContent = userProfile.alamat || '-';
+            // Pastikan elemen ada sebelum mencoba mengupdate
+            const patientUsernameEl = document.getElementById('patientUsername');
+            const patientNamaLengkapEl = document.getElementById('patientNamaLengkap');
+            const patientEmailEl = document.getElementById('patientEmail');
+            const patientJenisKelaminEl = document.getElementById('patientJenisKelamin');
+            const patientUsiaEl = document.getElementById('patientUsia');
+            const patientNoTeleponEl = document.getElementById('patientNoTelepon');
+            const patientAlamatEl = document.getElementById('patientAlamat');
 
-            // TODO: Isi janji temu mendatang dan riwayat kunjungan
+            if (patientUsernameEl) patientUsernameEl.textContent = userProfile.username || '-';
+            if (patientNamaLengkapEl) patientNamaLengkapEl.textContent = userProfile.nama_lengkap || '-';
+            if (patientEmailEl) patientEmailEl.textContent = userProfile.email || '-';
+            if (patientJenisKelaminEl) patientJenisKelaminEl.textContent = userProfile.jenis_kelamin || '-';
+            if (patientUsiaEl) patientUsiaEl.textContent = userProfile.usia || '-';
+            if (patientNoTeleponEl) patientNoTeleponEl.textContent = userProfile.no_telepon || '-';
+            if (patientAlamatEl) patientAlamatEl.textContent = userProfile.alamat || '-';
+
             const upcomingAppointmentsList = document.getElementById('upcomingAppointments');
             if (upcomingAppointmentsList) {
                 if (data.upcomingAppointments && data.upcomingAppointments.length > 0) {
@@ -658,7 +671,7 @@ async function fetchPatientDashboardData() {
                         Status: ${visit.status_janji}
                         </div>
                         </li>`
-                    ).join('');
+                        ).join('');
                 } else {
                     visitHistoryList.innerHTML = `<li class="appointment-item">Tidak ada riwayat kunjungan.</li>`;
                 }
@@ -795,13 +808,15 @@ async function handleNewAppointmentFormSubmit(event) {
 
         if (response.ok) {
             alert(result.message);
-            form.reset(); // Reset form
+            form.reset();
             // Muat ulang daftar janji temu mendatang
-            fetchPatientDashboardData(); // Untuk update appointments dan profile
+            fetchPatientDashboardData();
         } else if (response.status === 401 || response.status === 403) {
             alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
             localStorage.removeItem('token');
-            window.location.href = '/login';
+            window.location.href = '/login';        
+        } else if (response.status === 409) { // Status 409 untuk bentrok/slot tidak tersedia
+            alert(result.message || 'Slot janji temu sudah terisi atau tidak tersedia. Mohon pilih waktu lain.');
         } else {
             alert(result.message || 'Gagal membuat janji temu.');
         }
@@ -815,7 +830,8 @@ async function handleNewAppointmentFormSubmit(event) {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('script.js (DOMContentLoaded): DOM fully loaded and parsed.');
 
-    // --- Inisialisasi Event Listeners untuk Formulir ---
+    // --- Inisialisasi Event Listeners untuk Formulir (Anda sudah punya ini) ---
+    // Pastikan ID form di HTML Anda sesuai dengan yang dipanggil di sini
     const loginForm = document.querySelector('#loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', handleLoginFormSubmit);
@@ -834,6 +850,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('Frontend: User Register form event listener added.');
     }
 
+    const resendVerificationForm = document.querySelector('#resendVerificationForm');
+    if (resendVerificationForm) {
+        resendVerificationForm.addEventListener('submit', handleResendVerificationEmail);
+        console.log('Frontend: Resend verification email form event listener added.');
+    }
+
     const forgotPasswordForm = document.querySelector('#forgotPasswordForm');
     if (forgotPasswordForm) {
         forgotPasswordForm.addEventListener('submit', handleForgotPasswordFormSubmit);
@@ -846,8 +868,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('Frontend: Reset password form event listener added.');
     }
 
-    const addUserForm = document.getElementById('addUserForm'); // <--- Pindah ke sini
-    if (addUserForm) { // Pastikan elemen form ada di halaman (yaitu di dashboard admin)
+    const addUserForm = document.getElementById('addUserForm');
+    if (addUserForm) {
         addUserForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             const form = event.target;
@@ -884,9 +906,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     }
-    // --- AKHIR BAGIAN KODE UNTUK FORM "TAMBAH PENGGUNA BARU" ---
 
-    // --- Fungsi Logout ---
+    // --- Fungsi Logout (Anda sudah punya ini) ---
     const logoutButton = document.getElementById('logoutButton');
     if (logoutButton) {
         logoutButton.addEventListener('click', () => {
@@ -896,10 +917,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- Panggilan Fungsi Dashboard/User Management ---
+    // --- Panggilan Fungsi Dashboard/User Management (Anda sudah punya ini) ---
     const currentPath = window.location.pathname;
 
-    // Hanya jalankan logika fetch data dashboard/users jika berada di halaman admin dashboard
     if (currentPath === '/admin/dashboard') {
         console.log('script.js (DOMContentLoaded): On admin dashboard page. Attempting to fetch data.');
         const token = getToken();
@@ -924,9 +944,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         fetchPatientDashboardData();
 
-        // --- TAMBAH INI UNTUK BOOKING ---
-        // Panggil untuk memuat dokter dan layanan saat halaman pasien dimuat
-        loadBookingFormData(); 
+        loadBookingFormData(); // Ini sudah ada di kode Anda
 
         const doctorSelect = document.getElementById('doctorSelect');
         const appointmentDate = document.getElementById('appointmentDate');
@@ -937,28 +955,101 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (appointmentDate) {
             appointmentDate.addEventListener('change', loadAvailableDoctorSlots);
-            // Set tanggal minimum hari ini
             appointmentDate.min = new Date().toISOString().split('T')[0];
         }
         if (newAppointmentForm) {
             newAppointmentForm.addEventListener('submit', handleNewAppointmentFormSubmit);
         }
-        // --- AKHIR PENAMBAHAN UNTUK BOOKING ---
     } else {
         console.log('script.js (DOMContentLoaded): Not on admin or patient dashboard. Skipping data fetch.');
     }
-});
 
-    // Jika ada halaman dashboard lain (dokter, staff, pasien) yang juga perlu data terautentikasi,
-    // Anda bisa menambahkan kondisi serupa di sini
-    // else if (currentPath.startsWith('/dokter/dashboard')) {
-    //     const token = getToken();
-    //     if (!token) {
-    //         alert('Sesi Anda telah berakhir atau Anda belum login. Silakan login kembali.');
-    //         localStorage.removeItem('token');
-    //         window.location.href = '/login';
-    //         return;
-    //     }
-    //     // Panggil fungsi fetch data untuk dokter
-    //     // fetchDokterData();
-    //}
+    // ====================================================================
+    // START: KODE UI BARU YANG DIMASUKKAN DI SINI (oleh Gemini)
+    // Ini adalah kode JavaScript untuk Navigasi, Carousel, dan Animasi UI umum.
+    // ====================================================================
+
+    // --- Navigasi & Dropdown Menu ---
+    // Pastikan elemen dengan class 'has-dropdown' dan 'dropdown-menu' ada di HTML Anda
+    const hasDropdown = document.querySelector('.has-dropdown');
+    if (hasDropdown) {
+        hasDropdown.addEventListener('click', function(e) {
+            e.preventDefault(); // Mencegah link default
+            this.querySelector('.dropdown-menu').classList.toggle('active');
+        });
+
+        // Menutup dropdown jika klik di luar
+        document.addEventListener('click', function(e) {
+            if (!hasDropdown.contains(e.target) && !e.target.closest('.dropdown-menu')) {
+                hasDropdown.querySelector('.dropdown-menu').classList.remove('active');
+            }
+        });
+    }
+
+    // --- Mobile Menu Toggle ---
+    // Pastikan elemen dengan class 'mobile-menu-toggle' dan 'main-nav' ada di HTML Anda
+    const mobileMenuToggle = document.querySelector('.mobile-menu-toggle');
+    const mainNav = document.querySelector('.main-nav');
+    if (mobileMenuToggle && mainNav) {
+        mobileMenuToggle.addEventListener('click', function() {
+            mainNav.classList.toggle('active');
+        });
+    }
+
+    // --- Testimonial Carousel ---
+    // Pastikan elemen dengan class 'testimonial-carousel', 'carousel-prev', dan 'carousel-next' ada di HTML Anda
+    const carousel = document.querySelector('.testimonial-carousel');
+    const prevBtn = document.querySelector('.carousel-prev');
+    const nextBtn = document.querySelector('.carousel-next');
+    let currentIndex = 0;
+
+    if (carousel && prevBtn && nextBtn) {
+        const items = carousel.children;
+        const totalItems = items.length;
+
+        function showItem(index) {
+            for (let i = 0; i < totalItems; i++) {
+                items[i].style.display = 'none';
+            }
+            if (items[index]) { // Pastikan item ada sebelum mencoba menampilkan
+                items[index].style.display = 'block';
+            }
+        }
+
+        // Tampilkan item pertama saat halaman dimuat
+        if (totalItems > 0) {
+            showItem(currentIndex);
+        }
+
+        prevBtn.addEventListener('click', () => {
+            currentIndex = (currentIndex > 0) ? currentIndex - 1 : totalItems - 1;
+            showItem(currentIndex);
+        });
+
+        nextBtn.addEventListener('click', () => {
+            currentIndex = (currentIndex < totalItems - 1) ? currentIndex + 1 : 0;
+            showItem(currentIndex);
+        });
+    }
+
+    // --- Animasi Sederhana (contoh: Hero CTA Button) ---
+    // Pastikan elemen dengan class 'hero-cta' ada di HTML Anda
+    const heroCta = document.querySelector('.hero-cta');
+    if (heroCta) {
+        // Efek pulse ringan saat dimuat
+        heroCta.animate([
+            { transform: 'scale(1)' },
+            { transform: 'scale(1.03)' },
+            { transform: 'scale(1)' }
+        ], {
+            duration: 1000,
+            iterations: Infinity,
+            easing: 'ease-in-out'
+        });
+    }
+
+    // ====================================================================
+    // END: KODE UI BARU YANG DIMASUKKAN DI SINI (oleh Gemini)
+    // ====================================================================
+
+});
