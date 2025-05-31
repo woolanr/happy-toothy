@@ -169,7 +169,7 @@ const User = {
             console.log('userModel: Connection released after doctor update attempt.');
         }
     },
-    
+
 
     // START: METHOD BARU UNTUK MEMBUAT DOKTER LENGKAP (USER, PROFILE, DOCTOR)
     createFullDoctorWithDetails: async (doctorData) => {
@@ -233,6 +233,44 @@ const User = {
         } finally {
             connection.release(); 
             console.log('userModel: Connection released.');
+        }
+    },
+
+    softDeleteDoctorByDoctorId: async (doctorId) => {
+        console.log(`userModel: softDeleteDoctorByDoctorId called for doctorId: ${doctorId}`);
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // 1. Cari id_user dari tabel doctors berdasarkan id_doctor
+            const [doctorRows] = await connection.execute('SELECT id_user FROM DOCTORS WHERE id_doctor = ?', [doctorId]);
+
+            if (doctorRows.length === 0) {
+                console.log(`userModel: No doctor found with id_doctor: ${doctorId}. No user to deactivate.`);
+                await connection.rollback(); // Tidak perlu commit jika tidak ada yang diubah
+                return { affectedRows: 0 }; // Kembalikan 0 baris terpengaruh
+            }
+            const userIdToDeactivate = doctorRows[0].id_user;
+            console.log(`userModel: Found userId: ${userIdToDeactivate} for doctorId: ${doctorId}`);
+
+            // 2. Update id_status_valid di tabel USERS menjadi 3 (atau status nonaktifmu)
+            const statusNonaktif = 3; // Asumsi 3 adalah status nonaktif/keluar
+            const [updateResult] = await connection.execute(
+                'UPDATE USERS SET id_status_valid = ? WHERE id_user = ? AND id_status_valid != ?', // Tambahkan pengecekan agar tidak update jika sudah nonaktif
+                [statusNonaktif, userIdToDeactivate, statusNonaktif]
+            );
+            
+            await connection.commit();
+            console.log(`userModel: User account (ID: ${userIdToDeactivate}) associated with doctorId: ${doctorId} has been deactivated. Affected rows by user update: ${updateResult.affectedRows}`);
+            return updateResult; // Mengembalikan hasil operasi update (termasuk affectedRows)
+
+        } catch (error) {
+            await connection.rollback();
+            console.error('userModel: Transaction failed in softDeleteDoctorByDoctorId:', error);
+            throw error;
+        } finally {
+            connection.release();
+            console.log('userModel: Connection released after softDeleteDoctorByDoctorId attempt.');
         }
     },
     
@@ -420,12 +458,47 @@ const User = {
         return rows;
     },
 
-    updateUser: async (id_user, userData) => {
-        // CATATAN: Jika userData mengandung field PROFILE, ini harus di-handle dengan UPDATE JOIN atau fungsi terpisah di model PROFILE.
-        const [result] = await db.execute('UPDATE USERS SET ? WHERE id_user = ?', [userData, id_user]);
-        return result;
-    },
+    updateUser: async (id_user, userDataToUpdate) => {
+        console.log(`userModel: updateUser called for id_user: ${id_user} with data:`, userDataToUpdate);
 
+        // Pastikan ada data untuk diupdate
+        if (Object.keys(userDataToUpdate).length === 0) {
+            console.log('userModel: No data provided to update for user:', id_user);
+            return { affectedRows: 0, message: 'Tidak ada data yang diupdate.' }; // Tidak ada yang diupdate
+        }
+
+        // Buat SET clause secara dinamis
+        let setClauses = [];
+        let values = [];
+
+        for (const key in userDataToUpdate) {
+            // Pastikan hanya field yang valid untuk tabel USERS yang dimasukkan
+            // dan nilainya tidak undefined
+            if (userDataToUpdate[key] !== undefined /* && kamu bisa tambahkan validasi nama kolom di sini jika perlu */) {
+                setClauses.push(`${key} = ?`);
+                values.push(userDataToUpdate[key]);
+            }
+        }
+
+        if (setClauses.length === 0) {
+            console.log('userModel: No valid fields to update for user:', id_user);
+            return { affectedRows: 0, message: 'Tidak ada field valid yang diupdate.' };
+        }
+
+        values.push(id_user); // Tambahkan id_user untuk WHERE clause
+
+        const sql = `UPDATE USERS SET ${setClauses.join(', ')} WHERE id_user = ?`;
+        console.log('userModel: Executing SQL:', sql, 'with values:', values);
+
+        try {
+            const [result] = await db.execute(sql, values);
+            console.log('userModel: updateUser successful, affected rows:', result.affectedRows);
+            return result;
+        } catch (error) {
+            console.error(`userModel: Error updating user with id_user ${id_user}:`, error);
+            throw error; // Biarkan controller menangani error HTTP
+        }
+    },
 };
 
 module.exports = User;

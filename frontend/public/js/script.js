@@ -363,13 +363,24 @@ async function fetchUsers() {
             headers: getAuthHeaders() 
         });
         const result = await response.json();
-
         const userListBody = document.getElementById('userListBody');
 
         if (response.ok && result.users && userListBody) {
             userListBody.innerHTML = ''; 
             result.users.forEach(user => {
                 const row = userListBody.insertRow();
+                let actionButtons = '';
+
+                if (user.id_status_valid === 3) { 
+                    actionButtons = `<button class="btn btn-sm btn-success activate-btn" data-userid="${user.id_user}" data-username="${user.username}">Aktifkan</button>`;
+                } else {
+                    actionButtons = `
+                        <button class="btn btn-sm btn-edit edit-btn" data-id="${user.id_user}">Edit</button>
+                        <button class="btn btn-sm btn-danger delete-btn" data-id="${user.id_user}">Nonaktifkan</button> 
+                        ${user.id_status_valid !== 1 ? `<button class="btn btn-sm btn-warning verify-btn" data-id="${user.id_user}">Verifikasi</button>` : ''}
+                    `;
+                }
+
                 row.innerHTML = `
                     <td>${user.id_user}</td>
                     <td>${user.username}</td>
@@ -393,6 +404,13 @@ async function fetchUsers() {
             });
             document.querySelectorAll('.verify-btn').forEach(button => {
                 button.addEventListener('click', handleVerifyUser);
+            });
+            document.querySelectorAll('#userListBody .activate-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const userId = this.dataset.userid;
+                    const userName = this.dataset.username;
+                    handleActivateUser(userId, userName);
+                });
             });
 
         } else if (response.status === 401 || response.status === 403) {
@@ -642,14 +660,12 @@ function populateDoctorTable(doctors) {
     doctorListBody.innerHTML = ''; 
 
     const headers = document.querySelectorAll('#doctor-management-section table thead th');
-    const colspanCount = headers.length || 8; // Default jika a_header tidak ditemukan
+    const colspanCount = headers.length || 9; 
 
     if (doctors && doctors.length > 0) {
         console.log('populateDoctorTable: Processing doctors data to create table rows.');
         doctors.forEach(doctor => {
             const row = doctorListBody.insertRow();
-            // Sesuaikan urutan dan field dengan <thead> di dashboard.ejs
-            // Contoh jika urutannya: ID Dokter, Nama, Spesialisasi, Email, No. Telp, Lisensi, Pengalaman, Aksi
             const rowHTML = `
                 <td>${doctor.id_doctor || 'N/A'}</td> 
                 <td>${doctor.id_user || 'N/A'}</td>
@@ -665,17 +681,23 @@ function populateDoctorTable(doctors) {
                 </td>
             `;
             row.innerHTML = rowHTML;
-            // console.log('populateDoctorTable: Added row - HTML:', rowHTML); // Kurangi log ini jika terlalu banyak
 
-            // TAMBAHKAN EVENT LISTENER UNTUK TOMBOL EDIT DOKTER
             const editButton = row.querySelector('.edit-btn');
             if (editButton) {
                 editButton.addEventListener('click', function() {
                     const doctorId = this.dataset.id;
-                    handleEditDoctorFlow(doctorId); // Panggil fungsi baru untuk alur edit dokter
+                    handleEditDoctorFlow(doctorId);
                 });
             }
-            // TODO: Tambahkan event listener untuk tombol delete dokter nanti
+            const deleteButton = row.querySelector('.delete-btn');
+            if (deleteButton) {
+                deleteButton.addEventListener('click', function() {
+                    const doctorId = this.dataset.id;
+                    const userId = this.dataset.userid; // Ambil userId dari data attribute
+                    const doctorName = doctor.nama_lengkap || `Dokter dengan ID ${doctorId}`; // Untuk pesan konfirmasi
+                    handleDeactivateDoctor(doctorId, userId, doctorName); // Panggil fungsi baru
+                });
+            }
         });
     } else {
         console.log('populateDoctorTable: No doctors data to display. Showing "Tidak ada data dokter."');
@@ -683,14 +705,14 @@ function populateDoctorTable(doctors) {
     }
 }
 
-// FUNGSI BARU UNTUK MENANGANI ALUR EDIT DOKTER (mengambil data dan mengisi form)
+// FUungsi Untuk  Alur Edit Dokter
 async function handleEditDoctorFlow(doctorId) {
     console.log(`handleEditDoctorFlow called for doctorId: ${doctorId}`);
     const addDoctorModalElement = document.getElementById('addDoctorModal');
-    const addDoctorForm = document.getElementById('addDoctorForm'); // Form yang sama untuk tambah/edit
+    const addDoctorForm = document.getElementById('addDoctorForm'); 
     const modalTitle = addDoctorModalElement.querySelector('.modal-header h2');
     const submitButton = addDoctorForm.querySelector('button[type="submit"]');
-    const editDoctorIdInput = document.getElementById('editDoctorId'); // Hidden input di form
+    const editDoctorIdInput = document.getElementById('editDoctorId'); 
 
     if (!addDoctorModalElement || !addDoctorForm || !modalTitle || !submitButton || !editDoctorIdInput) {
         console.error('Satu atau lebih elemen modal untuk edit dokter tidak ditemukan.');
@@ -699,7 +721,7 @@ async function handleEditDoctorFlow(doctorId) {
     }
 
     try {
-        const response = await fetch(`/admin/doctors/${doctorId}`, { // Endpoint GET data dokter by ID
+        const response = await fetch(`/admin/doctors/${doctorId}`, {
             method: 'GET',
             headers: getAuthHeaders()
         });
@@ -709,25 +731,22 @@ async function handleEditDoctorFlow(doctorId) {
             const doctor = result.data;
             console.log('Data dokter diterima untuk diedit:', doctor);
 
-            // Isi form dengan data dokter
             document.getElementById('addDoctor_nama_lengkap').value = doctor.nama_lengkap || '';
-            document.getElementById('addDoctor_username').value = doctor.username || ''; // Username dokter (dari tabel users)
-            document.getElementById('addDoctor_email').value = doctor.email || '';       // Email dokter (dari tabel users)
+            document.getElementById('addDoctor_username').value = doctor.username || '';
+            document.getElementById('addDoctor_email').value = doctor.email || '';
             
-            // Kosongkan field password dan beri placeholder. 
-            // User hanya mengisi jika ingin mengubah password. Logika ini akan ditangani di backend saat update.
             const passwordField = document.getElementById('addDoctor_password');
             if (passwordField) {
                 passwordField.value = ''; 
                 passwordField.placeholder = 'Kosongkan jika tidak ingin mengubah password';
             }
 
-            document.getElementById('addDoctor_no_telepon').value = doctor.no_telepon || ''; // Dari tabel profile (via join)
-            document.getElementById('addDoctor_spesialisasi').value = doctor.spesialisasi || ''; // Dari tabel doctors
-            document.getElementById('addDoctor_lisensi_no').value = doctor.lisensi_no || '';     // Dari tabel doctors
-            document.getElementById('addDoctor_pengalaman_tahun').value = doctor.pengalaman_tahun !== null ? doctor.pengalaman_tahun : ''; // Dari tabel doctors
+            document.getElementById('addDoctor_no_telepon').value = doctor.no_telepon || ''; 
+            document.getElementById('addDoctor_spesialisasi').value = doctor.spesialisasi || ''; 
+            document.getElementById('addDoctor_lisensi_no').value = doctor.lisensi_no || '';     
+            document.getElementById('addDoctor_pengalaman_tahun').value = doctor.pengalaman_tahun !== null ? doctor.pengalaman_tahun : '';
             
-            editDoctorIdInput.value = doctor.id_doctor; // Simpan id_doctor di hidden input
+            editDoctorIdInput.value = doctor.id_doctor;
 
             modalTitle.textContent = 'Edit Data Dokter';
             submitButton.textContent = 'Update Data Dokter';
@@ -743,13 +762,71 @@ async function handleEditDoctorFlow(doctorId) {
     }
 }
 
+async function handleDeactivateDoctor(doctorId, userId, doctorName) {
+    console.log(`handleDeactivateDoctor called for doctorId: ${doctorId}, userId: ${userId}, name: ${doctorName}`);
+
+    if (confirm(`Anda yakin ingin menonaktifkan akun dokter "${doctorName}" (User ID: ${userId})? Data dokter akan tetap ada tetapi akunnya tidak bisa login.`)) {
+        try {
+            const response = await fetch(`/admin/doctors/${doctorId}/deactivate`, {
+                method: 'PUT', 
+                headers: getAuthHeaders()
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                alert(result.message || `Akun dokter "${doctorName}" berhasil dinonaktifkan.`);
+                fetchDoctors(); 
+            } else {
+                alert(result.message || `Gagal menonaktifkan akun dokter "${doctorName}".`);
+                console.error('Gagal menonaktifkan dokter:', result);
+            }
+        } catch (error) {
+            console.error('Error di handleDeactivateDoctor:', error);
+            alert('Terjadi kesalahan saat mencoba menonaktifkan akun dokter.');
+        }
+    } else {
+        console.log('Deactivation cancelled by user.');
+    }
+}
+
+async function handleActivateUser(userId, userName) {
+    console.log(`handleActivateUser called for userId: ${userId}, name: ${userName}`);
+
+    if (confirm(`Anda yakin ingin mengaktifkan kembali akun untuk "${userName}" (User ID: ${userId})?`)) {
+        try {
+            const response = await fetch(`/admin/users/${userId}/activate`, {
+                method: 'PUT',
+                headers: getAuthHeaders()
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                alert(result.message || `Akun untuk "${userName}" berhasil diaktifkan kembali.`);
+                if (document.getElementById('userListBody')) {
+                    fetchUsers(); 
+                }
+            } else {
+                alert(result.message || `Gagal mengaktifkan akun untuk "${userName}".`);
+                console.error('Gagal mengaktifkan akun:', result);
+            }
+        } catch (error) {
+            console.error('Error di handleActivateUser:', error);
+            alert('Terjadi kesalahan saat mencoba mengaktifkan akun pengguna.');
+        }
+    } else {
+        console.log('Activation cancelled by user.');
+    }
+}
+
 // --- Fungsi untuk Pasien Dashboard & Booking ---
 async function fetchPatientDashboardData() {
     try {
         console.log('script.js (fetchPatientDashboardData): Fetching patient dashboard data...');
         const response = await fetch('/pasien/dashboard-data', {
             method: 'GET',
-            headers: getAuthHeaders() // Gunakan header otentikasi
+            headers: getAuthHeaders()
         });
         const data = await response.json();
 
@@ -826,7 +903,6 @@ async function fetchPatientDashboardData() {
     }
 }
 
-// Memuat data dokter dan layanan ke dropdown
 async function loadBookingFormData() {
     try {
         console.log('script.js: Loading booking form data (doctors and services)...');
@@ -869,13 +945,12 @@ async function loadBookingFormData() {
     }
 }
 
-// Memuat jadwal kosong dokter berdasarkan dokter dan tanggal
 async function loadAvailableDoctorSlots() {
     const doctorId = document.getElementById('doctorSelect').value;
     const date = document.getElementById('appointmentDate').value;
     const appointmentTimeSelect = document.getElementById('appointmentTime');
     
-    appointmentTimeSelect.innerHTML = '<option value="">Memuat slot...</option>'; // Placeholder
+    appointmentTimeSelect.innerHTML = '<option value="">Memuat slot...</option>';
 
     if (!doctorId || !date) {
         appointmentTimeSelect.innerHTML = '<option value="">Pilih tanggal dan dokter...</option>';
@@ -894,10 +969,8 @@ async function loadAvailableDoctorSlots() {
             appointmentTimeSelect.innerHTML = '<option value="">Pilih Waktu</option>';
             if (data.schedules && data.schedules.length > 0) {
                 data.schedules.forEach(schedule => {
-                    // Anda mungkin perlu memecah slot jadwal menjadi interval durasi layanan di sini
-                    // Contoh sederhana: hanya menampilkan waktu mulai jadwal
                     const option = document.createElement('option');
-                    option.value = schedule.waktu_mulai; // Format HH:MM:SS
+                    option.value = schedule.waktu_mulai;
                     option.textContent = `${schedule.waktu_mulai.substring(0, 5)} - ${schedule.waktu_selesai.substring(0, 5)}`;
                     appointmentTimeSelect.appendChild(option);
                 });
@@ -915,7 +988,6 @@ async function loadAvailableDoctorSlots() {
     }
 }
 
-// Menangani submit form janji temu baru
 async function handleNewAppointmentFormSubmit(event) {
     event.preventDefault();
 
@@ -1019,7 +1091,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- Fungsi Logout ---
-    const globalLogoutButton = document.getElementById('logoutButton'); // Pastikan ID ini unik dan ada di EJS
+    const globalLogoutButton = document.getElementById('logoutButton'); 
     if (globalLogoutButton) {
         globalLogoutButton.addEventListener('click', () => {
             localStorage.removeItem('token');
@@ -1074,13 +1146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('script.js (DOMContentLoaded): Not on admin or patient dashboard. Skipping data fetch.');
     }
 
-    // ====================================================================
-    // START: KODE UI BARU YANG DIMASUKKAN DI SINI (oleh Gemini)
-    // Ini adalah kode JavaScript untuk Navigasi, Carousel, dan Animasi UI umum.
-    // ====================================================================
-
     // --- Navigasi & Dropdown Menu ---
-    // Pastikan elemen dengan class 'has-dropdown' dan 'dropdown-menu' ada di HTML Anda
     const hasDropdown = document.querySelector('.has-dropdown');
     if (hasDropdown) {
         hasDropdown.addEventListener('click', function(e) {
@@ -1088,7 +1154,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             this.querySelector('.dropdown-menu').classList.toggle('active');
         });
 
-        // Menutup dropdown jika klik di luar
         document.addEventListener('click', function(e) {
             if (!hasDropdown.contains(e.target) && !e.target.closest('.dropdown-menu')) {
                 hasDropdown.querySelector('.dropdown-menu').classList.remove('active');
@@ -1097,7 +1162,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- Mobile Menu Toggle ---
-    // Pastikan elemen dengan class 'mobile-menu-toggle' dan 'main-nav' ada di HTML Anda
     const mobileMenuToggle = document.querySelector('.mobile-menu-toggle');
     const mainNav = document.querySelector('.main-nav');
     if (mobileMenuToggle && mainNav) {
@@ -1107,7 +1171,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- Testimonial Carousel ---
-    // Pastikan elemen dengan class 'testimonial-carousel', 'carousel-prev', dan 'carousel-next' ada di HTML Anda
     const carousel = document.querySelector('.testimonial-carousel');
     const prevBtn = document.querySelector('.carousel-prev');
     const nextBtn = document.querySelector('.carousel-next');
@@ -1121,12 +1184,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             for (let i = 0; i < totalItems; i++) {
                 items[i].style.display = 'none';
             }
-            if (items[index]) { // Pastikan item ada sebelum mencoba menampilkan
+            if (items[index]) {
                 items[index].style.display = 'block';
             }
         }
 
-        // Tampilkan item pertama saat halaman dimuat
         if (totalItems > 0) {
             showItem(currentIndex);
         }
@@ -1143,10 +1205,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- Animasi Sederhana (contoh: Hero CTA Button) ---
-    // Pastikan elemen dengan class 'hero-cta' ada di HTML Anda
     const heroCta = document.querySelector('.hero-cta');
     if (heroCta) {
-        // Efek pulse ringan saat dimuat
         heroCta.animate([
             { transform: 'scale(1)' },
             { transform: 'scale(1.03)' },

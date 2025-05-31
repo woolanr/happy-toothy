@@ -42,7 +42,8 @@ router.get('/admin/doctors', protect, authorizeRoles([1]), userController.getAll
 router.post('/admin/doctors', protect, authorizeRoles([1]), userController.createDoctor);
 router.get('/admin/doctors/:id', protect, authorizeRoles([1]), userController.getDoctorByIdForEdit);
 router.put('/admin/doctors/:id', protect, authorizeRoles([1]), userController.updateDoctor);
-console.log('AdminRoutes: Registered PUT /admin/doctors/:id');
+router.put('/admin/doctors/:id/deactivate', protect, authorizeRoles([1]), userController.deactivateDoctorAccount);
+console.log('AdminRoutes: Registered PUT /admin/doctors/:id/deactivate');
 
 // --- Route untuk Booking (oleh Pasien) ---
 // ... (rute booking) ...

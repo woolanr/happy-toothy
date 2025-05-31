@@ -271,7 +271,7 @@ const userController = {
             res.status(500).json({ message: 'Gagal memperbarui pengguna.' });
         }
     },
-
+    
     updateDoctor: async (req, res) => {
         const doctorId = req.params.id; // Ini adalah id_doctor dari tabel DOCTORS
         console.log(`userController: updateDoctor called for doctorId: ${doctorId}`);
@@ -346,6 +346,31 @@ const userController = {
             console.error(`userController: Error in updateDoctor for doctorId ${doctorId}:`, error);
             // Tambahkan penanganan error spesifik jika perlu (misal, unique constraint lain)
             res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat mengupdate data dokter.' });
+        }
+    },
+
+    // START: FUNGSI BARU UNTUK MENONAKTIFKAN AKUN DOKTER (SOFT DELETE)
+    deactivateDoctorAccount: async (req, res) => {
+        const doctorId = req.params.id; // Ini adalah id_doctor dari tabel DOCTORS
+        console.log(`userController: deactivateDoctorAccount called for doctorId: ${doctorId}`);
+
+        try {
+            // Kita perlu method di model untuk melakukan soft delete berdasarkan id_doctor.
+            // Method ini akan mencari id_user terkait lalu mengupdate statusnya.
+            const result = await User.softDeleteDoctorByDoctorId(doctorId);
+
+            if (result.affectedRows > 0) {
+                res.status(200).json({ success: true, message: 'Akun dokter berhasil dinonaktifkan.' });
+                console.log(`userController: Doctor account deactivated successfully for doctorId: ${doctorId}`);
+            } else {
+                // Ini bisa terjadi jika dokter dengan ID tersebut tidak ditemukan,
+                // atau jika id_user terkait tidak ditemukan/statusnya sudah nonaktif.
+                res.status(404).json({ success: false, message: 'Dokter tidak ditemukan atau akun sudah nonaktif.' });
+                console.log(`userController: Doctor not found or already inactive for doctorId: ${doctorId}`);
+            }
+        } catch (error) {
+            console.error(`userController: Error in deactivateDoctorAccount for doctorId ${doctorId}:`, error);
+            res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat menonaktifkan akun dokter.' });
         }
     },
 
