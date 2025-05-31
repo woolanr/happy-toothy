@@ -83,6 +83,74 @@ const userController = {
         }
     },
 
+    createDoctor: async (req, res) => {
+        console.log('userController: createDoctor called.');
+        const {
+            nama_lengkap,
+            username,
+            email,
+            password,
+            no_telepon, // Opsional
+            spesialisasi,
+            lisensi_no,
+            pengalaman_tahun
+        } = req.body;
+
+        // 1. Validasi Input Dasar (lakukan validasi yang lebih detail jika perlu)
+        if (!nama_lengkap || !username || !email || !password || !spesialisasi || !lisensi_no || pengalaman_tahun === undefined) {
+            return res.status(400).json({ success: false, message: 'Semua field wajib diisi: Nama Lengkap, Username, Email, Password, Spesialisasi, No. Lisensi, dan Pengalaman.' });
+        }
+
+        try {
+            // 2. Cek apakah username atau email sudah ada (opsional tapi direkomendasikan)
+            const existingUserByUsername = await User.findByUsername(username);
+            if (existingUserByUsername && existingUserByUsername.length > 0) {
+                return res.status(409).json({ success: false, message: 'Username sudah terdaftar. Silakan gunakan username lain.' });
+            }
+            const existingUserByEmail = await User.findByEmail(email);
+            if (existingUserByEmail && existingUserByEmail.length > 0) {
+                return res.status(409).json({ success: false, message: 'Email sudah terdaftar. Silakan gunakan email lain.' });
+            }
+
+            // 3. Hash password sebelum disimpan
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // 4. Siapkan data untuk dikirim ke model
+            const doctorData = {
+                nama_lengkap,
+                username,
+                email,
+                password: hashedPassword,
+                no_telepon: no_telepon || null, // Jika kosong, kirim null
+                id_level_user: 2, // Otomatis set level ke 2 (Dokter)
+                id_status_valid: 1, // Otomatis set status ke 1 (Valid)
+                
+                // Detail spesifik dokter
+                spesialisasi,
+                lisensi_no,
+                pengalaman_tahun: parseInt(pengalaman_tahun)
+            };
+            // 5. Panggil fungsi model untuk membuat user, profile, dan entry dokter
+            // Kita akan buat fungsi User.createFullDoctorWithDetails di userModel.js
+            const newDoctor = await User.createFullDoctorWithDetails(doctorData);
+
+            res.status(201).json({
+                success: true,
+                message: 'Dokter baru berhasil ditambahkan!',
+                data: { doctorId: newDoctor.newDoctorId, userId: newDoctor.newUserId } // Kirim ID kembali jika perlu
+            });
+            console.log('userController: createDoctor - Doctor created successfully with UserID:', newDoctor.newUserId, 'and DoctorID:', newDoctor.newDoctorId);
+
+        } catch (error) {
+            console.error('userController: Error in createDoctor:', error);
+            // Penanganan error spesifik (misalnya, jika model melempar error dengan kode tertentu)
+            if (error.code === 'ER_DUP_ENTRY') { // Contoh jika ada unique constraint di DB
+                 return res.status(409).json({ success: false, message: 'Data duplikat terdeteksi (misalnya, lisensi no sudah ada jika unique).' });
+            }
+            res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat menambahkan dokter baru.' });
+        }
+    },
+
     // Fungsi untuk menambahkan pengguna baru secara manual oleh admin
     addUser: async (req, res) => {
         console.log('userController: addUser called.');
@@ -204,6 +272,83 @@ const userController = {
         }
     },
 
+    updateDoctor: async (req, res) => {
+        const doctorId = req.params.id; // Ini adalah id_doctor dari tabel DOCTORS
+        console.log(`userController: updateDoctor called for doctorId: ${doctorId}`);
+        
+        const {
+            nama_lengkap, // dari profile
+            username,     // dari users
+            email,        // dari users (& profile)
+            password,     // dari users (opsional, hanya jika diubah)
+            no_telepon,   // dari profile
+            spesialisasi, // dari doctors
+            lisensi_no,   // dari doctors
+            pengalaman_tahun // dari doctors
+        } = req.body;
+
+        // 1. Validasi Input Dasar (sesuaikan dengan field yang boleh diubah)
+        if (!nama_lengkap || !username || !email || !spesialisasi || !lisensi_no || pengalaman_tahun === undefined) {
+            return res.status(400).json({ success: false, message: 'Field Nama Lengkap, Username, Email, Spesialisasi, No. Lisensi, dan Pengalaman wajib diisi.' });
+        }
+
+        try {
+            // 2. Dapatkan data dokter yang ada, terutama id_user dan id_profile terkait
+            const existingDoctorData = await User.findDoctorById(doctorId); // Method ini sudah kamu punya
+            if (!existingDoctorData) {
+                return res.status(404).json({ success: false, message: 'Dokter yang akan diupdate tidak ditemukan.' });
+            }
+            const userId = existingDoctorData.id_user; // id_user dari dokter yang akan diupdate
+            const profileId = existingDoctorData.id_profile; // id_profile dari dokter yang akan diupdate
+
+            // 3. Cek duplikasi username/email jika diubah dan bukan milik user saat ini
+            if (username && username !== existingDoctorData.username) {
+                const otherUserWithUsername = await User.findByUsername(username);
+                if (otherUserWithUsername && otherUserWithUsername.length > 0 && otherUserWithUsername[0].id_user !== userId) {
+                    return res.status(409).json({ success: false, message: 'Username sudah digunakan oleh pengguna lain.' });
+                }
+            }
+            if (email && email !== existingDoctorData.email) {
+                const otherUserWithEmail = await User.findByEmail(email);
+                if (otherUserWithEmail && otherUserWithEmail.length > 0 && otherUserWithEmail[0].id_user !== userId) {
+                    return res.status(409).json({ success: false, message: 'Email sudah digunakan oleh pengguna lain.' });
+                }
+            }
+            
+            // 4. Siapkan data untuk update
+            const userDataToUpdate = { email, username }; // Field di tabel USERS
+            const profileDataToUpdate = { nama_lengkap, email, no_telepon: no_telepon || null }; // Field di tabel PROFILE
+            const doctorSpecificDataToUpdate = { spesialisasi, lisensi_no, pengalaman_tahun: parseInt(pengalaman_tahun) }; // Field di tabel DOCTORS
+
+            // Jika password diisi di form, berarti admin ingin mengubahnya
+            if (password && password.trim() !== '') {
+                userDataToUpdate.password = await bcrypt.hash(password, 10);
+            }
+
+            // 5. Panggil fungsi model untuk melakukan update secara transaksional
+            // Kita akan buat User.updateFullDoctorDetails(userId, profileId, doctorId, userData, profileData, doctorSpecificData)
+            await User.updateFullDoctorDetails(
+                userId,
+                profileId,
+                doctorId, // id_doctor (PK dari tabel doctors)
+                userDataToUpdate,
+                profileDataToUpdate,
+                doctorSpecificDataToUpdate
+            );
+
+            res.status(200).json({
+                success: true,
+                message: 'Data dokter berhasil diupdate!'
+            });
+            console.log(`userController: updateDoctor - Doctor data updated successfully for doctorId: ${doctorId}`);
+
+        } catch (error) {
+            console.error(`userController: Error in updateDoctor for doctorId ${doctorId}:`, error);
+            // Tambahkan penanganan error spesifik jika perlu (misal, unique constraint lain)
+            res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat mengupdate data dokter.' });
+        }
+    },
+
     // Fungsi untuk menghapus (atau menonaktifkan) pengguna
     deleteUser: async (req, res) => {
         console.log('userController: deleteUser called.');
@@ -227,11 +372,27 @@ const userController = {
             console.log('userController: getAllDoctors - Doctors received from model:', doctors.length);
             res.status(200).json({ success: true, data: doctors });
             console.log('userController: getAllDoctors - Response sent.');
-            
+
         } catch (error) {
             console.error('userController: Error in getAllDoctors:', error);
             console.error('Error Stack:', error.stack); 
             res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat mengambil daftar dokter.' });
+        }
+    },
+
+    getDoctorByIdForEdit: async (req, res) => {
+        console.log('userController: getDoctorByIdForEdit called for ID:', req.params.id);    
+        try {
+            const doctorId = req.params.id;
+            const doctor = await User.findDoctorById(doctorId); 
+            if (doctor) {
+                res.status(200).json({ success: true, data: doctor });        
+            } else {
+                res.status(404).json({ success: false, message: 'Data dokter tidak ditemukan.' });        
+            }
+        } catch (error) {
+            console.error('userController: Error in getDoctorByIdForEdit:', error);
+            res.status(500).json({ success: false, message: 'Gagal mengambil data dokter.' });
         }
     },
 

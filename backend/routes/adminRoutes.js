@@ -5,7 +5,7 @@ const authController = require('../controllers/authController'); // Untuk regist
 const { protect, authorizeRoles } = require('../middleware/authMiddleware'); // Import middleware otentikasi/otorisasi
 const userController = require('../controllers/userController'); // Untuk operasi user management
 
-// Middleware untuk melindungi route ini (isAdmin)
+// --- Route API untuk Dashboard Admin ---
 const isAdmin = (req, res, next) => {
     if (req.user && req.user.id_level_user === 1) {
         next();
@@ -14,53 +14,44 @@ const isAdmin = (req, res, next) => {
     }
 };
 
-// --- Route untuk Halaman Admin (GET requests) ---
+// --- Route untuk Halaman Admin ---
 router.get('/admin/register', protect, authorizeRoles([1]), (req, res) => {
     console.log('Admin Register page requested by authorized user.');
-    res.render('admin/register'); // Menampilkan file admin/register.ejs
+    res.render('admin/register');
 });
-
 // --- Route API untuk Dashboard Admin ---
-
-// GET /admin/dashboard-data
 router.get('/admin/dashboard-data', protect, authorizeRoles([1]), userController.getAdminDashboardData);
 console.log('AdminRoutes: Registered GET /admin/dashboard-data');
 
 // --- Route API untuk Manajemen Pengguna ---
-
-// GET /admin/users (Mengambil semua data pengguna)
 router.get('/admin/users', protect, authorizeRoles([1]), userController.getAllUsers);
 console.log('AdminRoutes: Registered GET /admin/users');
-
-// POST /admin/users (Menambahkan pengguna baru)
 router.post('/admin/users', protect, authorizeRoles([1]), userController.addUser);
 console.log('AdminRoutes: Registered POST /admin/users');
 
-// --- ROUTE KRITIS UNTUK EDIT: GET /admin/users/:id ---
-// Mengambil detail satu pengguna berdasarkan ID (untuk edit)
+// --- Route Untuk Edit ---
 router.get('/admin/users/:id', protect, authorizeRoles([1]), userController.getUserById);
-console.log('AdminRoutes: Registered GET /admin/users/:id'); // <<-- LOG INI SEKARANG UNTUK ROUTE INI
-
-// PUT /admin/users/:id (Mengedit data pengguna)
+console.log('AdminRoutes: Registered GET /admin/users/:id'); 
 router.put('/admin/users/:id', protect, authorizeRoles([1]), userController.updateUser);
-console.log('AdminRoutes: Registered PUT /admin/users/:id'); // <<-- LOG INI UNTUK ROUTE PUT
-
-// DELETE /admin/users/:id (Menghapus atau menonaktifkan pengguna)
+console.log('AdminRoutes: Registered PUT /admin/users/:id'); 
 router.delete('/admin/users/:id', protect, authorizeRoles([1]), userController.deleteUser);
 console.log('AdminRoutes: Registered DELETE /admin/users/:id');
 
-// GET /admin/doctors (Mengambil semua data dokter untuk admin)
+// --- Route API untuk Manajemen Dokter ---
 router.get('/admin/doctors', protect, authorizeRoles([1]), userController.getAllDoctors);
-console.log('AdminRoutes: Registered GET /admin/doctors');
+router.post('/admin/doctors', protect, authorizeRoles([1]), userController.createDoctor);
+router.get('/admin/doctors/:id', protect, authorizeRoles([1]), userController.getDoctorByIdForEdit);
+router.put('/admin/doctors/:id', protect, authorizeRoles([1]), userController.updateDoctor);
+console.log('AdminRoutes: Registered PUT /admin/doctors/:id');
 
-// TODO: Nantinya kamu bisa menambahkan rute lain untuk dokter di sini:
-// POST /admin/doctors (Menambahkan dokter baru)
-// GET /admin/doctors/:id (Detail dokter)
-// PUT /admin/doctors/:id (Update dokter)
-// DELETE /admin/doctors/:id (Hapus dokter)
-// ===========================================================
-// END: BAGIAN YANG DITAMBAHKAN UNTUK MANAJEMEN DOKTER
-// ===========================================================
+// --- Route untuk Booking (oleh Pasien) ---
+// ... (rute booking) ...
+
+// --- Route API untuk Registrasi Admin ---
+// ... (rute registrasi admin) ...
+
+// --- API DASHBOARD PASIEN ---
+// ... (rute dashboard pasien) ...
 
 // Mendapatkan daftar dokter dan layanan untuk form booking
 router.get('/booking/form-data', protect, authorizeRoles([4]), userController.getBookingFormData);

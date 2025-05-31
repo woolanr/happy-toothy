@@ -1,7 +1,6 @@
 // frontend/public/js/script.js
 
 // --- Bagian Awal: Fungsi Global (getToken, getAuthHeaders) ---
-// Fungsi helper untuk mendapatkan token dari localStorage
 function getToken() {
     const token = localStorage.getItem('token');
     // Log token hanya sebagian untuk keamanan di console
@@ -9,7 +8,6 @@ function getToken() {
     return token;
 }
 
-// Fungsi helper untuk menambahkan header Authorization
 function getAuthHeaders() {
     const token = getToken();
     const headers = { 'Content-Type': 'application/json' };
@@ -22,11 +20,10 @@ function getAuthHeaders() {
     return headers;
 }
 
-// --- Bagian Fungsi Login dan Registrasi Utama (handleLoginFormSubmit, dll.) ---
 
-// Function to handle login form submission
+// --- Fungsi Login, Registrasi, Redirect, Logout, dll. ---
 async function handleLoginFormSubmit(event) {
-    event.preventDefault(); // Prevent default form submission
+    event.preventDefault();
 
     const form = event.target;
     const username = form.username.value;
@@ -34,7 +31,7 @@ async function handleLoginFormSubmit(event) {
 
     try {
         console.log('Frontend: Sending login request to backend for username:', username);
-        const response = await fetch('/login', { // Endpoint backend untuk login
+        const response = await fetch('/login', { 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -53,16 +50,14 @@ async function handleLoginFormSubmit(event) {
                     localStorage.setItem('token', data.token); // Simpan token di localStorage
                     console.log('Frontend: Token saved to localStorage successfully.');
 
-                    // Pastikan token benar-benar bisa diambil setelah disimpan
                     const storedToken = localStorage.getItem('token');
                     if (!storedToken) {
                         console.error('Frontend: ERROR! Token failed to persist in localStorage immediately after saving.');
                         alert('Terjadi masalah saat menyimpan sesi. Silakan coba login kembali.');
-                        return; // TIDAK melakukan redirect jika token gagal persist
+                        return; 
                     }
                     console.log('Frontend: Token confirmed in localStorage:', storedToken.substring(0, 10) + '...');
 
-                    // Lakukan redirect setelah token dipastikan tersimpan
                     performRedirect(data.user);
 
                 } catch (e) {
@@ -71,7 +66,7 @@ async function handleLoginFormSubmit(event) {
                 }
             } else {
                 console.warn('Frontend: Login successful, but no token received in response data. Redirecting without token.');
-                performRedirect(data.user); // Tetap coba redirect meskipun tanpa token jika tidak ada masalah lain (misal user guest)
+                performRedirect(data.user);
             }
         } else {
             console.log('Frontend: Login failed. Backend message:', data.message);
@@ -83,7 +78,6 @@ async function handleLoginFormSubmit(event) {
     }
 }
 
-// Function to handle registration form submission (Admin)
 async function handleAdminRegisterFormSubmit(event) {
     event.preventDefault();
 
@@ -93,11 +87,11 @@ async function handleAdminRegisterFormSubmit(event) {
         email: form.email.value,
         username: form.username.value,
         password: form.password.value,
-        id_level_user: form.id_level_user.value // Ambil dari dropdown
+        id_level_user: form.id_level_user.value
     };
     try {
         console.log('Frontend: Sending admin registration request.');
-        const response = await fetch('/admin/register', { // Endpoint admin
+        const response = await fetch('/admin/register', { 
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(data)
@@ -116,7 +110,6 @@ async function handleAdminRegisterFormSubmit(event) {
     }
 }
 
-// Function to handle registration form submission (Pengguna)
 async function handleRegisterFormSubmit(event) {
     event.preventDefault();
 
@@ -125,7 +118,7 @@ async function handleRegisterFormSubmit(event) {
     const email = form.email.value;
     const username = form.username.value;
     const password = form.password.value;
-    const id_level_user = form.id_level_user.value; // Ini hidden input, value=4
+    const id_level_user = form.id_level_user.value;
 
     try {
         console.log('Frontend: Sending user registration request.');
@@ -150,11 +143,11 @@ async function handleRegisterFormSubmit(event) {
         } else if (response.ok && contentType && contentType.includes('application/json')) {
             const data = await response.json();
             alert(data.message);
-            if (data.user && data.user.id_level_user === 1) { // Hanya untuk admin
+            if (data.user && data.user.id_level_user === 1) {
                 window.location.href = '/admin/dashboard';
             }
         } else {
-            const errorMessage = await response.text(); // Coba baca sebagai teks
+            const errorMessage = await response.text(); 
             console.error('Frontend: Registration failed with status', response.status, 'and message:', errorMessage);
             alert(`Terjadi kesalahan saat registrasi: ${response.status} - ${errorMessage.substring(0, 100)}...`);
         }
@@ -165,7 +158,6 @@ async function handleRegisterFormSubmit(event) {
     }
 }
 
-// --- FUNGSI UNTUK KIRIM ULANG EMAIL VERIFIKASI ---
 async function handleResendVerificationEmail(event) {
     event.preventDefault();
 
@@ -185,7 +177,7 @@ async function handleResendVerificationEmail(event) {
 
         if (response.ok) {
             alert(data.message || 'Email verifikasi telah berhasil dikirim ulang. Silakan cek kotak masuk Anda.');
-            form.reset(); // Kosongkan form setelah sukses
+            form.reset();
         } else {
             alert(data.message || 'Gagal mengirim ulang email verifikasi. Mohon coba lagi.');
         }
@@ -195,7 +187,6 @@ async function handleResendVerificationEmail(event) {
     }
 }
 
-// --- FUNGSI REDIRECT UTAMA ---
 function performRedirect(userData) {
     if (userData && userData.id_level_user) {
         console.log('Frontend: Performing redirect based on user level:', userData.id_level_user);
@@ -221,7 +212,6 @@ function performRedirect(userData) {
     }
 }
 
-// --- FUNGSI UNTUK LUPA PASSWORD ---
 async function handleForgotPasswordFormSubmit(event) {
     event.preventDefault();
 
@@ -250,7 +240,6 @@ async function handleForgotPasswordFormSubmit(event) {
     }
 }
 
-// --- FUNGSI UNTUK RESET PASSWORD ---
 async function handleResetPasswordFormSubmit(event) {
     event.preventDefault();
 
@@ -283,7 +272,7 @@ async function handleResetPasswordFormSubmit(event) {
 
         if (response.ok) {
             alert(data.message);
-            window.location.href = '/login'; // Redirect ke halaman login setelah berhasil
+            window.location.href = '/login';
         } else {
             alert(data.message);
         }
@@ -294,18 +283,16 @@ async function handleResetPasswordFormSubmit(event) {
 }
 
 // --- Fungsi Logout ---
-const logoutButton = document.getElementById('logoutButton'); // Pastikan ada tombol logout di HTML Anda
+const logoutButton = document.getElementById('logoutButton');
 if (logoutButton) {
     logoutButton.addEventListener('click', () => {
-        localStorage.removeItem('token'); // Hapus token dari localStorage
+        localStorage.removeItem('token'); 
         alert('Anda telah logout.');
-        window.location.href = '/login'; // Redirect ke halaman login
+        window.location.href = '/login';
     });
 }
 
-// --- Fungsi Helper untuk Dashboard Admin (dari admin.js) ---
-
-// Fungsi helper untuk mendapatkan nama level pengguna
+// --- Fungsi Helper Dashboard Admin ---
 function getLevelName(id_level_user) {
     switch (id_level_user) {
         case 1: return 'Admin';
@@ -316,28 +303,26 @@ function getLevelName(id_level_user) {
     }
 }
 
-// Fungsi helper untuk mendapatkan nama status validasi
 function getStatusName(id_status_valid) {
     switch (id_status_valid) {
         case 1: return 'Valid';
         case 2: return 'Belum Valid';
-        case 3: return 'Keluar'; // Status nonaktif/dihapus
+        case 3: return 'Keluar';
         default: return 'Tidak Diketahui';
     }
 }
 
-// Fungsi untuk mengambil data dashboard
+// --- Fungsi Fetch Data Dashboard Admin ---
 async function fetchDashboardData() {
     try {
         console.log('script.js (fetchDashboardData): Fetching dashboard data...');
         const response = await fetch('/admin/dashboard-data', {
             method: 'GET',
-            headers: getAuthHeaders() // Gunakan header otentikasi
+            headers: getAuthHeaders()
         });
         const data = await response.json();
 
         if (response.ok) {
-            // Periksa apakah elemen HTML ada sebelum memperbarui
             const totalUsersEl = document.getElementById('totalUsers');
             const totalDoctorsEl = document.getElementById('totalDoctors');
             const pendingVerificationsEl = document.getElementById('pendingVerifications');
@@ -369,20 +354,20 @@ async function fetchDashboardData() {
     }
 }
 
-// Fungsi untuk mengambil daftar pengguna dan mengisi tabel
+// --- Fungsi Manajemen Pengguna (CRUD Users) ---
 async function fetchUsers() {
     try {
         console.log('script.js (fetchUsers): Fetching users data...');
-        const response = await fetch('/admin/users', { // API untuk ambil semua pengguna
+        const response = await fetch('/admin/users', { 
             method: 'GET',
-            headers: getAuthHeaders() // Gunakan header otentikasi
+            headers: getAuthHeaders() 
         });
         const result = await response.json();
 
         const userListBody = document.getElementById('userListBody');
 
         if (response.ok && result.users && userListBody) {
-            userListBody.innerHTML = ''; // Kosongkan tabel sebelum mengisi ulang
+            userListBody.innerHTML = ''; 
             result.users.forEach(user => {
                 const row = userListBody.insertRow();
                 row.innerHTML = `
@@ -400,7 +385,6 @@ async function fetchUsers() {
                 `;
             });
 
-            // Tambahkan event listener untuk tombol aksi setelah data dimuat
             document.querySelectorAll('.edit-btn').forEach(button => {
                 button.addEventListener('click', handleEditUser);
             });
@@ -424,7 +408,6 @@ async function fetchUsers() {
     }
 }
 
-// --- FUNGSI MANAJEMEN CRUD PENGGUNA  ---
 function createEditUserModal(user) {
     const modal = document.createElement('div');
     modal.id = 'editUserModal';
@@ -476,28 +459,24 @@ function createEditUserModal(user) {
 
     document.body.appendChild(modal);
 
-    // Event listener untuk tombol Batal
     document.getElementById('closeModalBtn').addEventListener('click', () => {
         modal.remove();
     });
 
-    // Event listener untuk submit form edit
     document.getElementById('editUserForm').addEventListener('submit', handleUpdateUser);
 }
 
-// Fungsi untuk menangani edit pengguna (akan menampilkan modal/form terpisah)
 async function handleEditUser(event) {
     const userId = event.target.dataset.id;
     try {
-        const response = await fetch(`/admin/users/${userId}`, { // Path sudah benar
+        const response = await fetch(`/admin/users/${userId}`, { 
             method: 'GET',
             headers: getAuthHeaders()
         });
         const result = await response.json();
 
-        // Penting: result.users adalah objek user sekarang (karena backend mengirim users: userObject)
-        if (response.ok && result.users) { // Periksa result.users (objek user)
-            createEditUserModal(result.users); // <<<-- KIRIM OBJEK USER KE MODAL
+        if (response.ok && result.users) { 
+            createEditUserModal(result.users);
         } else if (response.status === 401 || response.status === 403) {
             alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
             localStorage.removeItem('token');
@@ -537,7 +516,7 @@ async function handleUpdateUser(event) {
         if (response.ok) {
             alert(result.message);
             document.getElementById('editUserModal').remove(); // Tutup modal
-            fetchUsers(); // Muat ulang daftar pengguna
+            fetchUsers();
         } else if (response.status === 401 || response.status === 403) {
             alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
             localStorage.removeItem('token');
@@ -551,7 +530,6 @@ async function handleUpdateUser(event) {
     }
 }
 
-// Fungsi untuk menangani hapus/nonaktifkan pengguna
 async function handleDeleteUser(event) {
     const userId = event.target.dataset.id;
     if (confirm(`Anda yakin ingin menonaktifkan/menghapus pengguna ID: ${userId}?`)) {
@@ -579,7 +557,6 @@ async function handleDeleteUser(event) {
     }
 }
 
-// Fungsi untuk menangani verifikasi email (opsional, jika admin bisa memverifikasi manual)
 async function handleVerifyUser(event) {
     const userId = event.target.dataset.id;
     if (confirm(`Anda yakin ingin memverifikasi pengguna ID: ${userId}?`)) {
@@ -608,6 +585,7 @@ async function handleVerifyUser(event) {
     }
 }
 
+//--- Fungsi Manajemen Dokter ---
 async function fetchDoctors() {
     try {
         console.log('script.js (fetchDoctors): Fetching doctors data...');
@@ -616,10 +594,10 @@ async function fetchDoctors() {
             headers: getAuthHeaders()
         });
         const result = await response.json();
-        console.log('script.js (fetchDoctors): API Response result:', result); // <-- Log hasil JSON dari backend
+        console.log('script.js (fetchDoctors): API Response result:', result);
 
         const doctorListBody = document.getElementById('doctorListBody');
-        console.log('script.js (fetchDoctors): doctorListBody element:', doctorListBody); // <-- Log elemen tbody
+        console.log('script.js (fetchDoctors): doctorListBody element:', doctorListBody);
 
         if (response.ok && result.success && result.data && doctorListBody) {
             populateDoctorTable(result.data);
@@ -631,13 +609,14 @@ async function fetchDoctors() {
             console.error('script.js (fetchDoctors): Conditions check failed:');
             console.error('  response.ok:', response.ok);
             console.error('  result.success:', result.success);
-            console.error('  result.data:', result.data);
+            console.error('  result.data:', result.data); 
             console.error('  doctorListBody exists:', !!doctorListBody);
-
+            
             console.error('script.js (fetchDoctors): Failed to fetch doctors -', result.message);
             if (doctorListBody) {
-                doctorListBody.innerHTML = `<tr><td colspan="5" class="text-center">${result.message || 'Gagal memuat data dokter (data tidak valid).'}</td></tr>`;
-            } else { 
+                const colspanCount = document.querySelector('#doctor-management-section table thead th')?.parentElement.childElementCount || 8; // Dinamis hitung colspan
+                doctorListBody.innerHTML = `<tr><td colspan="${colspanCount}" class="text-center">${result.message || 'Gagal memuat data dokter (data tidak valid).'}</td></tr>`;
+            } else {
                  alert(result.message || 'Gagal memuat data dokter (elemen tabel tidak ditemukan).');
             }
         }
@@ -645,7 +624,8 @@ async function fetchDoctors() {
         console.error('script.js (fetchDoctors): Error fetching doctors:', error);
         const doctorListBody = document.getElementById('doctorListBody');
         if (doctorListBody) {
-            doctorListBody.innerHTML = `<tr><td colspan="5" class="text-center">Terjadi kesalahan saat memuat data dokter.</td></tr>`;
+            const colspanCount = document.querySelector('#doctor-management-section table thead th')?.parentElement.childElementCount || 8;
+            doctorListBody.innerHTML = `<tr><td colspan="${colspanCount}" class="text-center">Terjadi kesalahan saat memuat data dokter.</td></tr>`;
         } else {
             alert('Terjadi kesalahan saat memuat data dokter.');
         }
@@ -654,23 +634,25 @@ async function fetchDoctors() {
 
 function populateDoctorTable(doctors) {
     console.log('populateDoctorTable called with doctors:', doctors);
-
     const doctorListBody = document.getElementById('doctorListBody');
     if (!doctorListBody) {
         console.error("populateDoctorTable: Element with ID 'doctorListBody' not found.");
         return;
     }
-
     doctorListBody.innerHTML = ''; 
+
+    const headers = document.querySelectorAll('#doctor-management-section table thead th');
+    const colspanCount = headers.length || 8; // Default jika a_header tidak ditemukan
 
     if (doctors && doctors.length > 0) {
         console.log('populateDoctorTable: Processing doctors data to create table rows.');
         doctors.forEach(doctor => {
             const row = doctorListBody.insertRow();
-            
+            // Sesuaikan urutan dan field dengan <thead> di dashboard.ejs
+            // Contoh jika urutannya: ID Dokter, Nama, Spesialisasi, Email, No. Telp, Lisensi, Pengalaman, Aksi
             const rowHTML = `
                 <td>${doctor.id_doctor || 'N/A'}</td> 
-                <td>${doctor.id_user || 'N/A'}</td> 
+                <td>${doctor.id_user || 'N/A'}</td>
                 <td>${doctor.nama_lengkap || 'N/A'}</td>
                 <td>${doctor.spesialisasi || '-'}</td>
                 <td>${doctor.email || '-'}</td> 
@@ -678,20 +660,90 @@ function populateDoctorTable(doctors) {
                 <td>${doctor.lisensi_no || '-'}</td>
                 <td>${doctor.pengalaman_tahun !== null ? doctor.pengalaman_tahun : '-'}</td>
                 <td class="user-actions"> 
-                    <button class="edit-btn" data-id="${doctor.id_doctor}">Edit</button>
-                    <button class="delete-btn" data-id="${doctor.id_doctor}">Hapus</button>
+                    <button class="btn btn-sm btn-edit edit-btn" data-id="${doctor.id_doctor}">Edit</button>
+                    <button class="btn btn-sm btn-danger delete-btn" data-id="${doctor.id_doctor}">Hapus</button>
                 </td>
             `;
             row.innerHTML = rowHTML;
-            console.log('populateDoctorTable: Added row - HTML:', rowHTML);
+            // console.log('populateDoctorTable: Added row - HTML:', rowHTML); // Kurangi log ini jika terlalu banyak
 
+            // TAMBAHKAN EVENT LISTENER UNTUK TOMBOL EDIT DOKTER
+            const editButton = row.querySelector('.edit-btn');
+            if (editButton) {
+                editButton.addEventListener('click', function() {
+                    const doctorId = this.dataset.id;
+                    handleEditDoctorFlow(doctorId); // Panggil fungsi baru untuk alur edit dokter
+                });
+            }
+            // TODO: Tambahkan event listener untuk tombol delete dokter nanti
         });
     } else {
         console.log('populateDoctorTable: No doctors data to display. Showing "Tidak ada data dokter."');
-        doctorListBody.innerHTML = '<tr><td colspan="9" class="text-center">Tidak ada data dokter.</td></tr>';
+        doctorListBody.innerHTML = `<tr><td colspan="${colspanCount}" class="text-center">Tidak ada data dokter.</td></tr>`;
     }
 }
 
+// FUNGSI BARU UNTUK MENANGANI ALUR EDIT DOKTER (mengambil data dan mengisi form)
+async function handleEditDoctorFlow(doctorId) {
+    console.log(`handleEditDoctorFlow called for doctorId: ${doctorId}`);
+    const addDoctorModalElement = document.getElementById('addDoctorModal');
+    const addDoctorForm = document.getElementById('addDoctorForm'); // Form yang sama untuk tambah/edit
+    const modalTitle = addDoctorModalElement.querySelector('.modal-header h2');
+    const submitButton = addDoctorForm.querySelector('button[type="submit"]');
+    const editDoctorIdInput = document.getElementById('editDoctorId'); // Hidden input di form
+
+    if (!addDoctorModalElement || !addDoctorForm || !modalTitle || !submitButton || !editDoctorIdInput) {
+        console.error('Satu atau lebih elemen modal untuk edit dokter tidak ditemukan.');
+        alert('Gagal menyiapkan form edit dokter. Elemen tidak ditemukan.');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/admin/doctors/${doctorId}`, { // Endpoint GET data dokter by ID
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        const result = await response.json();
+
+        if (response.ok && result.success && result.data) {
+            const doctor = result.data;
+            console.log('Data dokter diterima untuk diedit:', doctor);
+
+            // Isi form dengan data dokter
+            document.getElementById('addDoctor_nama_lengkap').value = doctor.nama_lengkap || '';
+            document.getElementById('addDoctor_username').value = doctor.username || ''; // Username dokter (dari tabel users)
+            document.getElementById('addDoctor_email').value = doctor.email || '';       // Email dokter (dari tabel users)
+            
+            // Kosongkan field password dan beri placeholder. 
+            // User hanya mengisi jika ingin mengubah password. Logika ini akan ditangani di backend saat update.
+            const passwordField = document.getElementById('addDoctor_password');
+            if (passwordField) {
+                passwordField.value = ''; 
+                passwordField.placeholder = 'Kosongkan jika tidak ingin mengubah password';
+            }
+
+            document.getElementById('addDoctor_no_telepon').value = doctor.no_telepon || ''; // Dari tabel profile (via join)
+            document.getElementById('addDoctor_spesialisasi').value = doctor.spesialisasi || ''; // Dari tabel doctors
+            document.getElementById('addDoctor_lisensi_no').value = doctor.lisensi_no || '';     // Dari tabel doctors
+            document.getElementById('addDoctor_pengalaman_tahun').value = doctor.pengalaman_tahun !== null ? doctor.pengalaman_tahun : ''; // Dari tabel doctors
+            
+            editDoctorIdInput.value = doctor.id_doctor; // Simpan id_doctor di hidden input
+
+            modalTitle.textContent = 'Edit Data Dokter';
+            submitButton.textContent = 'Update Data Dokter';
+            
+            addDoctorModalElement.style.display = 'block';
+        } else {
+            alert(result.message || `Gagal mengambil data dokter dengan ID: ${doctorId}`);
+            console.error('Gagal mengambil data dokter untuk diedit:', result);
+        }
+    } catch (error) {
+        console.error('Error di handleEditDoctorFlow:', error);
+        alert('Terjadi kesalahan saat mencoba memuat data dokter untuk diedit.');
+    }
+}
+
+// --- Fungsi untuk Pasien Dashboard & Booking ---
 async function fetchPatientDashboardData() {
     try {
         console.log('script.js (fetchPatientDashboardData): Fetching patient dashboard data...');
@@ -913,42 +965,19 @@ async function handleNewAppointmentFormSubmit(event) {
 // --- Event listener utama untuk DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => {
 
-    // --- Inisialisasi Event Listeners untuk Formulir (Anda sudah punya ini) ---
     const loginForm = document.querySelector('#loginForm');
-    if (loginForm) {
-        loginForm.addEventListener('submit', handleLoginFormSubmit);
-        console.log('Frontend: Login form event listener added.');
-    }
-
+    if (loginForm) loginForm.addEventListener('submit', handleLoginFormSubmit);
     const adminRegisterForm = document.querySelector('#adminRegisterForm');
-    if (adminRegisterForm) {
-        adminRegisterForm.addEventListener('submit', handleAdminRegisterFormSubmit);
-        console.log('Frontend: Admin Register form event listener added.');
-    }
-
+    if (adminRegisterForm) adminRegisterForm.addEventListener('submit', handleAdminRegisterFormSubmit);
     const registerForm = document.querySelector('#registerForm');
-    if (registerForm) {
-        registerForm.addEventListener('submit', handleRegisterFormSubmit);
-        console.log('Frontend: User Register form event listener added.');
-    }
-
+    if (registerForm) registerForm.addEventListener('submit', handleRegisterFormSubmit);
     const resendVerificationForm = document.querySelector('#resendVerificationForm');
-    if (resendVerificationForm) {
-        resendVerificationForm.addEventListener('submit', handleResendVerificationEmail);
-        console.log('Frontend: Resend verification email form event listener added.');
-    }
-
+    if (resendVerificationForm) resendVerificationForm.addEventListener('submit', handleResendVerificationEmail);
     const forgotPasswordForm = document.querySelector('#forgotPasswordForm');
-    if (forgotPasswordForm) {
-        forgotPasswordForm.addEventListener('submit', handleForgotPasswordFormSubmit);
-        console.log('Frontend: Forgot password form event listener added.');
-    }
-
+    if (forgotPasswordForm) forgotPasswordForm.addEventListener('submit', handleForgotPasswordFormSubmit);
     const resetPasswordForm = document.querySelector('#resetPasswordForm');
-    if (resetPasswordForm) {
-        resetPasswordForm.addEventListener('submit', handleResetPasswordFormSubmit);
-        console.log('Frontend: Reset password form event listener added.');
-    }
+    if (resetPasswordForm) resetPasswordForm.addEventListener('submit', handleResetPasswordFormSubmit);
+    
 
     const addUserForm = document.getElementById('addUserForm');
     if (addUserForm) {
@@ -989,17 +1018,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- Fungsi Logout (Anda sudah punya ini) ---
-    const logoutButton = document.getElementById('logoutButton');
-    if (logoutButton) {
-        logoutButton.addEventListener('click', () => {
+    // --- Fungsi Logout ---
+    const globalLogoutButton = document.getElementById('logoutButton'); // Pastikan ID ini unik dan ada di EJS
+    if (globalLogoutButton) {
+        globalLogoutButton.addEventListener('click', () => {
             localStorage.removeItem('token');
             alert('Anda telah logout.');
             window.location.href = '/login';
         });
     }
 
-    // --- Panggilan Fungsi Dashboard/User Management (Anda sudah punya ini) ---
+    // Panggilan Fungsi Dashboard/User Management Awal
     const currentPath = window.location.pathname;
 
     if (currentPath === '/admin/dashboard') {
@@ -1012,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.href = '/login';
             return;
         }
-        fetchDashboardData();
+        if (typeof fetchDashboardData === 'function') fetchDashboardData();
     } else if (currentPath === '/pasien/dashboard') {
         console.log('script.js (DOMContentLoaded): On patient dashboard page. Attempting to fetch data.');
         const token = getToken();
@@ -1025,7 +1054,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         fetchPatientDashboardData();
 
-        loadBookingFormData(); // Ini sudah ada di kode Anda
+        loadBookingFormData();
 
         const doctorSelect = document.getElementById('doctorSelect');
         const appointmentDate = document.getElementById('appointmentDate');
@@ -1128,9 +1157,4 @@ document.addEventListener('DOMContentLoaded', async () => {
             easing: 'ease-in-out'
         });
     }
-
-    // ====================================================================
-    // END: KODE UI BARU YANG DIMASUKKAN DI SINI (oleh Gemini)
-    // ====================================================================
-
 });

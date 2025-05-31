@@ -82,6 +82,161 @@ const User = {
         }
     },
 
+    updateFullDoctorDetails: async (userId, profileId, doctorId, userDataToUpdate, profileDataToUpdate, doctorSpecificDataToUpdate) => {
+        const connection = await db.getConnection();
+        console.log(`userModel: updateFullDoctorDetails called for userId: ${userId}, profileId: ${profileId}, doctorId: ${doctorId}`);
+        console.log('Data to update USERS:', userDataToUpdate);
+        console.log('Data to update PROFILE:', profileDataToUpdate);
+        console.log('Data to update DOCTORS:', doctorSpecificDataToUpdate);
+
+        try {
+            await connection.beginTransaction();
+
+            // 1. Update tabel USERS
+            // Hanya update jika ada data di userDataToUpdate
+            if (Object.keys(userDataToUpdate).length > 0) {
+                // Buat SET clause secara dinamis (contoh sederhana)
+                let userSetClauses = [];
+                let userValues = [];
+                for (const key in userDataToUpdate) {
+                    if (userDataToUpdate[key] !== undefined) { // Pastikan nilai tidak undefined
+                        userSetClauses.push(`${key} = ?`);
+                        userValues.push(userDataToUpdate[key]);
+                    }
+                }
+                if (userSetClauses.length > 0) {
+                    userValues.push(userId); // Tambahkan userId untuk WHERE clause
+                    const userSql = `UPDATE USERS SET ${userSetClauses.join(', ')} WHERE id_user = ?`;
+                    await connection.execute(userSql, userValues);
+                    console.log(`userModel: USERS table updated for id_user: ${userId}`);
+                }
+            }
+
+            // 2. Update tabel PROFILE
+            // Hanya update jika ada data di profileDataToUpdate dan profileId valid
+            if (profileId && Object.keys(profileDataToUpdate).length > 0) {
+                let profileSetClauses = [];
+                let profileValues = [];
+                for (const key in profileDataToUpdate) {
+                    if (profileDataToUpdate[key] !== undefined) {
+                        profileSetClauses.push(`${key} = ?`);
+                        profileValues.push(profileDataToUpdate[key]);
+                    }
+                }
+                if (profileSetClauses.length > 0) {
+                    profileValues.push(profileId); // Tambahkan profileId untuk WHERE clause
+                    const profileSql = `UPDATE PROFILE SET ${profileSetClauses.join(', ')} WHERE id_profile = ?`;
+                    await connection.execute(profileSql, profileValues);
+                    console.log(`userModel: PROFILE table updated for id_profile: ${profileId}`);
+                }
+            } else if (!profileId && Object.keys(profileDataToUpdate).length > 0) {
+                // Kasus jika dokter ini belum punya profile (seharusnya tidak terjadi jika createFullDoctorWithDetails benar)
+                // Kamu bisa memilih untuk membuat profile baru di sini atau mengabaikannya.
+                // Untuk sekarang, kita asumsikan profileId selalu ada untuk dokter yang diedit.
+                console.warn(`userModel: profileId is missing for userId: ${userId}, cannot update profile.`);
+            }
+
+
+            // 3. Update tabel DOCTORS
+            // Hanya update jika ada data di doctorSpecificDataToUpdate
+            if (Object.keys(doctorSpecificDataToUpdate).length > 0) {
+                let doctorSetClauses = [];
+                let doctorValues = [];
+                for (const key in doctorSpecificDataToUpdate) {
+                    if (doctorSpecificDataToUpdate[key] !== undefined) {
+                        doctorSetClauses.push(`${key} = ?`);
+                        doctorValues.push(doctorSpecificDataToUpdate[key]);
+                    }
+                }
+                if (doctorSetClauses.length > 0) {
+                    doctorValues.push(doctorId); // Tambahkan doctorId untuk WHERE clause
+                    const doctorSql = `UPDATE DOCTORS SET ${doctorSetClauses.join(', ')} WHERE id_doctor = ?`;
+                    await connection.execute(doctorSql, doctorValues);
+                    console.log(`userModel: DOCTORS table updated for id_doctor: ${doctorId}`);
+                }
+            }
+
+            await connection.commit();
+            console.log('userModel: Transaction committed successfully for doctor update.');
+            return { success: true, message: 'Data dokter berhasil diupdate.' };
+
+        } catch (error) {
+            await connection.rollback();
+            console.error('userModel: Transaction failed in updateFullDoctorDetails:', error);
+            throw error; 
+        } finally {
+            connection.release();
+            console.log('userModel: Connection released after doctor update attempt.');
+        }
+    },
+    
+
+    // START: METHOD BARU UNTUK MEMBUAT DOKTER LENGKAP (USER, PROFILE, DOCTOR)
+    createFullDoctorWithDetails: async (doctorData) => {
+        const connection = await db.getConnection(); 
+        console.log('userModel: createFullDoctorWithDetails called with data:', doctorData);
+
+        try {
+            await connection.beginTransaction(); 
+
+            // 1. Insert ke tabel PROFILE
+            // Field yang kamu kirim dari controller untuk profile: nama_lengkap, email, no_telepon
+            // Pastikan tabel PROFILE kamu punya kolom-kolom ini.
+            const profileSql = 'INSERT INTO PROFILE (nama_lengkap, email, no_telepon) VALUES (?, ?, ?)';
+            const profileValues = [
+                doctorData.nama_lengkap,
+                doctorData.email,
+                doctorData.no_telepon // Bisa NULL jika opsional dan diizinkan di DB
+            ];
+            const [profileResult] = await connection.execute(profileSql, profileValues);
+            const newProfileId = profileResult.insertId;
+            console.log('userModel: Profile created with ID:', newProfileId);
+
+            // 2. Insert ke tabel USERS
+            // Field yang dibutuhkan: username, email, password (sudah di-hash), id_profile, id_level_user, id_status_valid
+            // Kolom lain seperti verification_token dll di-set NULL karena admin yang buat
+            const userSql = 'INSERT INTO USERS (username, email, password, id_profile, id_level_user, id_status_valid, verification_token, verification_expires, reset_password_token, reset_password_expires) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL)';
+            const userValues = [
+                doctorData.username,
+                doctorData.email,
+                doctorData.password,      // Password sudah di-hash di controller
+                newProfileId,             // FK ke profile yang baru dibuat
+                doctorData.id_level_user, // Seharusnya 2 (Dokter), dari controller
+                doctorData.id_status_valid// Seharusnya 1 (Valid), dari controller
+            ];
+            const [userResult] = await connection.execute(userSql, userValues);
+            const newUserId = userResult.insertId;
+            console.log('userModel: User (doctor account) created with ID:', newUserId);
+
+            // 3. Insert ke tabel DOCTORS
+            // Field yang dibutuhkan: id_user, spesialisasi, lisensi_no, pengalaman_tahun
+            const doctorSql = 'INSERT INTO DOCTORS (id_user, spesialisasi, lisensi_no, pengalaman_tahun) VALUES (?, ?, ?, ?)';
+            const doctorSpecificValues = [
+                newUserId, // id_user dari user yang baru saja dibuat
+                doctorData.spesialisasi,
+                doctorData.lisensi_no,
+                doctorData.pengalaman_tahun
+            ];
+            const [doctorResult] = await connection.execute(doctorSql, doctorSpecificValues);
+            const newDoctorId = doctorResult.insertId; 
+            console.log('userModel: Doctor details created with ID (doctors table PK):', newDoctorId);
+
+            await connection.commit(); 
+            console.log('userModel: Transaction committed successfully.');
+            
+            return { newUserId, newProfileId, newDoctorId };
+
+        } catch (error) {
+            await connection.rollback(); 
+            console.error('userModel: Transaction failed in createFullDoctorWithDetails:', error);
+            throw error; 
+        } finally {
+            connection.release(); 
+            console.log('userModel: Connection released.');
+        }
+    },
+    
+
     // --- FUNGSI VERIFIKASI & RESET TOKEN (Diubah ke async/await) ---
     updateStatusValid: async (id_user, id_status_valid) => {
         const [result] = await db.execute('UPDATE USERS SET id_status_valid = ? WHERE id_user = ?', [id_status_valid, id_user]);
@@ -128,15 +283,25 @@ const User = {
         return result;
     },
 
-    // --- FUNGSI DOKTER DAN LAYANAN (Diubah ke async/await) ---
+    // --- FUNGSI DOKTER DAN LAYANAN ---
     findDoctorById: async (id_doctor) => {
-        const [rows] = await db.execute('SELECT d.*, u.username, u.email, p.nama_lengkap FROM DOCTORS d JOIN USERS u ON d.id_user = u.id_user JOIN PROFILE p ON u.id_profile = p.id_profile WHERE d.id_doctor = ?', [id_doctor]);
+        const query = `
+            SELECT 
+                d.id_doctor, d.id_user, d.spesialisasi, d.lisensi_no, d.pengalaman_tahun, d.foto_profil_url, d.rating_rata2,
+                u.username, u.email, 
+                p.nama_lengkap, p.no_telepon 
+            FROM DOCTORS d 
+            JOIN USERS u ON d.id_user = u.id_user 
+            JOIN PROFILE p ON u.id_profile = p.id_profile 
+            WHERE d.id_doctor = ?
+        `;
+        const [rows] = await db.execute(query, [id_doctor]);
         return rows.length > 0 ? rows[0] : null;
     },
 
     findAllDoctors: async () => {
-        const [rows] = await db.execute('SELECT d.*, u.username, u.email, p.nama_lengkap, p.no_telepon FROM DOCTORS d JOIN USERS u ON d.id_user = u.id_user JOIN PROFILE p ON u.id_profile = p.id_profile');
-        return rows;
+        const [rows] = await db.execute('SELECT d.*, u.username, u.email, p.nama_lengkap, p.no_telepon FROM DOCTORS d JOIN USERS u ON d.id_user = u.id_user JOIN PROFILE p ON u.id_profile = p.id_profile WHERE u.id_level_user = 2 AND u.id_status_valid = 1'); // Saya tambahkan filter dokter aktif
+        return rows
     },
 
     findAllDoctorsWithDetails: async () => {
