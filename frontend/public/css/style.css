@@ -693,3 +693,533 @@ a:hover {
         padding: 12px;
     }
 }
+
+
+/* --- CSS DASHBOARD ADMIN --- */
+body {
+    background-color: #f4f7fa; /* Latar belakang lebih terang untuk dashboard */
+}
+
+.dashboard-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* --- Sidebar --- */
+.sidebar {
+    width: 250px;
+    background-color: #2c3e50; /* Darker blue/gray for sidebar */
+    color: white;
+    padding: 20px 0;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh; /* Memastikan sidebar mengisi tinggi viewport */
+    overflow-y: auto; /* Bisa di-scroll jika konten banyak */
+}
+
+.sidebar-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.sidebar-header a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: white; /* Default putih */
+}
+
+.sidebar-logo {
+    height: 45px;
+    margin-right: 10px;
+}
+
+.sidebar-title {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.6em;
+    font-weight: 700;
+}
+
+.sidebar-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+}
+
+.profile-avatar .fas {
+    font-size: 3.5em;
+    color: #8cde8e; /* Accent color */
+    margin-bottom: 10px;
+}
+
+.profile-info {
+    text-align: center;
+}
+
+.profile-name {
+    display: block;
+    font-weight: 700;
+    font-size: 1.1em;
+}
+
+.profile-role {
+    display: block;
+    font-size: 0.85em;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.btn-logout {
+    background-color: #e74c3c; /* Red color for logout */
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 15px;
+    font-size: 0.9em;
+    transition: background-color 0.3s ease;
+}
+
+.btn-logout:hover {
+    background-color: #c0392b;
+}
+
+.sidebar-nav ul {
+    list-style: none;
+    padding: 0;
+}
+
+.sidebar-nav ul li {
+    margin-bottom: 5px;
+}
+
+.sidebar-nav ul li a {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.sidebar-nav ul li a .fas {
+    margin-right: 15px;
+    font-size: 1.1em;
+}
+
+.sidebar-nav ul li a:hover,
+.sidebar-nav ul li.active > a { /* Untuk item menu utama yang aktif */
+    background-color: #34495e; /* Slightly lighter dark blue */
+    color: #8cde8e; /* Highlight dengan warna aksen */
+}
+
+/* Submenu Styling */
+.sidebar-nav ul li.has-submenu .submenu-icon {
+    margin-left: auto; /* Push icon to the right */
+    transition: transform 0.3s ease;
+}
+
+.sidebar-nav ul li.has-submenu > a {
+    display: flex; /* Untuk mensejajarkan ikon */
+    justify-content: space-between; /* Pisahkan teks dan ikon */
+    align-items: center;
+}
+
+.sidebar-nav ul li.has-submenu .submenu {
+    list-style: none;
+    padding-left: 20px; /* Indent submenu items */
+    max-height: 0; /* Hidden by default */
+    overflow: hidden;
+    transition: max-height 0.3s ease-out; /* Animasi buka/tutup */
+    background-color: #34495e; /* Latar belakang submenu */
+}
+
+.sidebar-nav ul li.has-submenu .submenu.active {
+    max-height: 200px; /* Maksimal tinggi saat aktif, sesuaikan */
+}
+
+.sidebar-nav ul li.has-submenu .submenu li a {
+    padding: 10px 20px 10px 40px; /* Padding lebih dalam untuk submenu */
+    font-size: 0.95em;
+}
+
+.sidebar-nav ul li.has-submenu .submenu li a:hover,
+.sidebar-nav ul li.active-submenu-item a { /* Untuk item submenu yang aktif */
+    background-color: #465a6f; /* Latar belakang hover/aktif untuk submenu */
+    color: #8cde8e;
+}
+
+/* --- Main Content Area --- */
+.main-content {
+    flex-grow: 1; /* Mengisi sisa lebar */
+    padding: 30px;
+}
+
+.main-header-dashboard {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+    margin-bottom: 30px;
+    border-bottom: 1px solid #eee;
+}
+
+.main-header-dashboard h1 {
+    font-size: 2.2em;
+    margin: 0;
+    color: #2c3e50;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.search-box {
+    position: relative;
+}
+
+.search-box input {
+    padding: 8px 15px 8px 35px; /* Padding kiri untuk ikon */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.search-box .fas {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #888;
+}
+
+.notifications .fas {
+    font-size: 1.5em;
+    color: #555;
+    position: relative;
+}
+
+.notifications .badge {
+    background-color: #e74c3c;
+    color: white;
+    font-size: 0.7em;
+    padding: 3px 6px;
+    border-radius: 50%;
+    position: absolute;
+    top: -8px;
+    right: -8px;
+}
+
+/* --- Content Sections --- */
+.content-section {
+    background-color: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    margin-bottom: 30px;
+}
+
+.content-section.hidden {
+    display: none;
+}
+
+/* --- Dashboard Overview Cards --- */
+.welcome-card {
+    background-color: #e0f2f7; /* Light blue accent */
+    border-left: 5px solid #007bff;
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+.welcome-card h2 {
+    color: #007bff;
+    font-size: 1.8em;
+}
+
+.welcome-card p {
+    color: #555;
+    font-size: 1.1em;
+}
+
+.summary-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+}
+
+.summary-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 25px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-5px);
+}
+
+.card-icon {
+    font-size: 2.5em;
+    color: #007bff;
+    opacity: 0.7;
+}
+
+.summary-card:nth-child(2) .card-icon { color: #8cde8e; } /* Dokter */
+.summary-card:nth-child(3) .card-icon { color: #f39c12; } /* Pending Verifications */
+/* Sesuaikan warna ikon card lainnya */
+
+.card-info {
+    text-align: right;
+    flex-grow: 1;
+}
+
+.card-value {
+    display: block;
+    font-size: 2em;
+    font-weight: 700;
+    color: #333;
+}
+
+.card-label {
+    display: block;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.recent-activity h3, .upcoming-appointments-admin h3 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+}
+
+.recent-activity ul {
+    list-style: none;
+    padding: 0;
+}
+
+.recent-activity ul li {
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+    color: #555;
+    display: flex;
+    align-items: center;
+}
+
+.recent-activity ul li .fas {
+    margin-right: 10px;
+    color: #007bff;
+}
+
+.recent-activity ul li:last-child {
+    border-bottom: none;
+}
+
+/* --- Data Table Styling (untuk user list, appointments, dll) --- */
+.data-table-container {
+    overflow-x: auto; /* Untuk tabel yang responsif */
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.data-table th, .data-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.data-table th {
+    background-color: #f8f8f8;
+    color: #555;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.9em;
+}
+
+.data-table tbody tr:hover {
+    background-color: #f0f8ff; /* Light blue on hover */
+}
+
+.data-table tbody tr:nth-child(even) { /* Striped rows */
+    background-color: #fafafa;
+}
+
+.data-table .text-center {
+    text-align: center;
+}
+
+.data-table .user-actions button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    margin-right: 5px;
+    transition: background-color 0.2s ease;
+}
+
+.data-table .user-actions button.edit-btn { background-color: #28a745; }
+.data-table .user-actions button.delete-btn { background-color: #dc3545; }
+.data-table .user-actions button.verify-btn { background-color: #f39c12; }
+
+.data-table .user-actions button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* --- Section Header (untuk Tambah Pengguna, Daftar Pengguna) --- */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.section-header h2 {
+    margin: 0;
+}
+
+/* --- Filter Controls --- */
+.filter-controls {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-controls input[type="text"],
+.filter-controls select {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.filter-controls input[type="text"] {
+    flex-grow: 1; /* Memungkinkan search bar mengisi ruang */
+    max-width: 300px;
+}
+
+/* --- Pagination --- */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 30px;
+    gap: 10px;
+}
+
+.pagination button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.pagination button:hover:not(.active) {
+    background-color: #0056b3;
+}
+
+.pagination button.active {
+    background-color: #0056b3;
+    font-weight: bold;
+}
+
+/* --- Form (untuk Tambah Pengguna Baru) --- */
+/* Menggunakan kembali class auth-container dan auth-form dari halaman login/regist */
+.auth-container.card { /* Tambahan style jika auth-container digunakan sebagai card */
+    padding: 30px; /* Sedikit kurang padding dari halaman auth */
+    max-width: 600px; /* Mungkin lebih lebar dari auth-page */
+    margin: 0 auto; /* Tengah di halaman */
+}
+
+/* Responsive Design for Dashboard */
+@media (max-width: 992px) {
+    .dashboard-container {
+        flex-direction: column; /* Tumpuk sidebar di atas konten */
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: static; /* Hilangkan sticky */
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        z-index: 999;
+    }
+
+    .sidebar-nav {
+        display: none; /* Sembunyikan navigasi secara default di mobile */
+    }
+
+    .sidebar-nav.active { /* Tampilkan saat toggle mobile menu diklik */
+        display: block;
+    }
+
+    .sidebar-nav ul {
+        flex-direction: column;
+    }
+
+    .sidebar-header a, .sidebar-profile {
+        justify-content: center;
+    }
+
+    .main-header-dashboard {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .header-right {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .summary-cards-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        padding: 20px;
+    }
+    .main-header-dashboard h1 {
+        font-size: 1.8em;
+    }
+    .summary-cards-grid {
+        grid-template-columns: 1fr; /* Stack cards on very small screens */
+    }
+    .data-table-container {
+        padding: 0; /* Hapus padding agar tabel lebih lebar di layar kecil */
+    }
+    .data-table th, .data-table td {
+        padding: 8px 10px;
+        font-size: 0.85em;
+    }
+    .filter-controls {
+        flex-direction: column;
+    }
+}

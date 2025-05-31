@@ -49,6 +49,19 @@ console.log('AdminRoutes: Registered PUT /admin/users/:id'); // <<-- LOG INI UNT
 router.delete('/admin/users/:id', protect, authorizeRoles([1]), userController.deleteUser);
 console.log('AdminRoutes: Registered DELETE /admin/users/:id');
 
+// GET /admin/doctors (Mengambil semua data dokter untuk admin)
+router.get('/admin/doctors', protect, authorizeRoles([1]), userController.getAllDoctors);
+console.log('AdminRoutes: Registered GET /admin/doctors');
+
+// TODO: Nantinya kamu bisa menambahkan rute lain untuk dokter di sini:
+// POST /admin/doctors (Menambahkan dokter baru)
+// GET /admin/doctors/:id (Detail dokter)
+// PUT /admin/doctors/:id (Update dokter)
+// DELETE /admin/doctors/:id (Hapus dokter)
+// ===========================================================
+// END: BAGIAN YANG DITAMBAHKAN UNTUK MANAJEMEN DOKTER
+// ===========================================================
+
 // Mendapatkan daftar dokter dan layanan untuk form booking
 router.get('/booking/form-data', protect, authorizeRoles([4]), userController.getBookingFormData);
 console.log('AdminRoutes: Registered GET /booking/form-data');

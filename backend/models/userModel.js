@@ -133,10 +133,42 @@ const User = {
         const [rows] = await db.execute('SELECT d.*, u.username, u.email, p.nama_lengkap FROM DOCTORS d JOIN USERS u ON d.id_user = u.id_user JOIN PROFILE p ON u.id_profile = p.id_profile WHERE d.id_doctor = ?', [id_doctor]);
         return rows.length > 0 ? rows[0] : null;
     },
+
     findAllDoctors: async () => {
         const [rows] = await db.execute('SELECT d.*, u.username, u.email, p.nama_lengkap, p.no_telepon FROM DOCTORS d JOIN USERS u ON d.id_user = u.id_user JOIN PROFILE p ON u.id_profile = p.id_profile');
         return rows;
     },
+
+    findAllDoctorsWithDetails: async () => {
+        console.log('userModel: findAllDoctorsWithDetails called.'); // Tambahkan log untuk memastikan
+        const query = `
+            SELECT 
+                d.id_doctor,
+                u.id_user,
+                u.username,
+                u.nama_lengkap,
+                u.email,
+                u.no_telp, 
+                d.spesialisasi,
+                d.lisensi_no,
+                d.pengalaman_tahun
+            FROM 
+                doctors d
+            JOIN 
+                users u ON d.id_user = u.id_user
+            WHERE 
+                u.id_level_user = 2 
+                AND u.id_status_valid = 1; 
+        `;
+        try {
+            const [rows] = await db.execute(query);
+            return rows;
+        } catch (error) {
+            console.error("Error in User.findAllDoctorsWithDetails model:", error);
+            throw error;
+        }
+    },
+
     findAllServices: async () => {
         const [rows] = await db.execute('SELECT * FROM SERVICES');
         return rows;
@@ -228,6 +260,7 @@ const User = {
         const [result] = await db.execute('UPDATE USERS SET ? WHERE id_user = ?', [userData, id_user]);
         return result;
     },
+
 };
 
 module.exports = User;

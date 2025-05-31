@@ -1,172 +1,413 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Admin - Happy Toothy</title>
     <link rel="stylesheet" href="/css/style.css">
-    <style>
-        /* CSS khusus untuk dashboard admin, bisa ditambahkan ke style.css juga */
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        .card {
-            background-color: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .card h3 {
-            color: #495057;
-            margin-bottom: 10px;
-        }
-        .card p {
-            font-size: 2em;
-            font-weight: bold;
-            color: #007bff;
-        }
-        .user-management-section {
-            margin-top: 40px;
-            text-align: left;
-        }
-        .user-management-section h3 {
-            margin-bottom: 20px;
-        }
-        .user-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        .user-table th, .user-table td {
-            border: 1px solid #dee2e6;
-            padding: 10px;
-            text-align: left;
-        }
-        .user-table th {
-            background-color: #e9ecef;
-            color: #495057;
-        }
-        .user-table tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
-        .user-actions button {
-            margin-right: 5px;
-            padding: 5px 10px;
-            font-size: 0.9em;
-        }
-        .add-user-form-container {
-            margin-top: 30px;
-            padding: 20px;
-            border: 1px solid #ced4da;
-            border-radius: 8px;
-            background-color: #f8f9fa;
-        }
-        .form-row {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-        .form-row .form-group {
-            flex: 1;
-            margin-bottom: 0; /* Override default form-group margin */
-        }
-        /* Style untuk modal */
-        #editUserModal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.5); display: flex;
-            justify-content: center; align-items: center; z-index: 1000;
-        }
-        #editUserModal > div {
-            background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); max-width: 500px; width: 90%;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <h1>Dashboard Admin</h1>
-        <p>Selamat datang, <span id="adminUsername">Admin!</span>!</p>
-        <p>Nama Lengkap: <span id="adminNamaLengkap">-</span></p>
-        <p>Jenis Kelamin: <span id="adminJenisKelamin">-</span></p>
-        <p>Usia: <span id="adminUsia">-</span> Tahun</p>
-        <button id="logoutButton">Logout</button>
-
-        <div class="dashboard-grid">
-            <div class="card">
-                <h3>Total Pengguna</h3>
-                <p id="totalUsers">0</p>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <a href="/admin/dashboard">
+                    <img src="/assets/images/logo toothy.png" alt="Happy Toothy Logo" class="sidebar-logo">
+                    <span class="sidebar-title">Happy Toothy</span>
+                </a>
             </div>
-            <div class="card">
-                <h3>Total Dokter</h3>
-                <p id="totalDoctors">0</p>
+            <div class="sidebar-profile">
+                <div class="profile-avatar">
+                    <i class="fas fa-user-circle"></i> </div>
+                <div class="profile-info">
+                    <span id="adminUsername" class="profile-name">Admin</span> <span class="profile-role">Administrator</span>
+                </div>
+                <button id="logoutButton" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
             </div>
-            <div class="card">
-                <h3>Verifikasi Tertunda</h3>
-                <p id="pendingVerifications">0</p>
-            </div>
-        </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-item active" data-section="overview">
+                        <a href="#"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item has-submenu" data-section="user-management">
+                        <a href="#"><i class="fas fa-users"></i> Manajemen Pengguna <i class="fas fa-chevron-down submenu-icon"></i></a>
+                        <ul class="submenu">
+                            <li data-subsection="user-list"><a href="#"><i class="fas fa-list"></i> Daftar Pengguna</a></li>
+                            <li data-subsection="add-user"><a href="#"><i class="fas fa-user-plus"></i> Tambah Pengguna Baru</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item" data-section="doctor-management">
+                        <a href="#"><i class="fas fa-user-md"></i> Manajemen Dokter</a>
+                    </li>
+                    <li class="nav-item" data-section="service-management">
+                        <a href="#"><i class="fas fa-tooth"></i> Manajemen Layanan</a>
+                    </li>
+                    <li class="nav-item" data-section="appointment-management">
+                        <a href="#"><i class="fas fa-calendar-check"></i> Manajemen Janji Temu</a>
+                    </li>
+                    <li class="nav-item" data-section="clinic-settings">
+                        <a href="#"><i class="fas fa-cog"></i> Pengaturan Klinik</a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
 
-        <div class="user-management-section">
-            <h3>Manajemen Pengguna</h3>
+        <main class="main-content">
+            <header class="main-header-dashboard">
+                <h1 id="pageTitle">Dashboard Admin</h1>
+                <div class="header-right">
+                    <div class="search-box">
+                        <input type="text" placeholder="Cari...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <div class="notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge">3</span> </div>
+                </div>
+            </header>
 
-            <div class="add-user-form-container">
-                <h4>Tambahkan Pengguna Baru</h4>
-                <form id="addUserForm">
-                    <div class="form-row">
+            <section class="content-section" id="overview-section">
+                <div class="welcome-card card">
+                    <h2>Selamat datang, <span id="welcomeAdminName">Admin</span>!</h2>
+                    <p>Ringkasan aktivitas dan status klinik Anda.</p>
+                </div>
+
+                <div class="summary-cards-grid">
+                    <div class="summary-card card">
+                        <div class="card-icon"><i class="fas fa-users"></i></div>
+                        <div class="card-info">
+                            <span class="card-value" id="totalUsers">0</span>
+                            <span class="card-label">Total Pengguna</span>
+                        </div>
+                    </div>
+                    <div class="summary-card card">
+                        <div class="card-icon"><i class="fas fa-user-md"></i></div>
+                        <div class="card-info">
+                            <span class="card-value" id="totalDoctors">0</span>
+                            <span class="card-label">Total Dokter</span>
+                        </div>
+                    </div>
+                    <div class="summary-card card">
+                        <div class="card-icon"><i class="fas fa-user-check"></i></div>
+                        <div class="card-info">
+                            <span class="card-value" id="pendingVerifications">0</span>
+                            <span class="card-label">Verifikasi Tertunda</span>
+                        </div>
+                    </div>
+                    </div>
+
+                <div class="recent-activity card">
+                    <h3>Aktivitas Terbaru</h3>
+                    <ul>
+                        <li><i class="fas fa-user-plus"></i> Pengguna baru mendaftar: Jennie (2 menit yang lalu)</li>
+                        <li><i class="fas fa-calendar-plus"></i> Janji temu baru dibuat: Jaehyun (5 menit yang lalu)</li>
+                        <li><i class="fas fa-bell"></i> Verifikasi email tertunda: Paus</li>
+                        </ul>
+                </div>
+
+                <div class="upcoming-appointments-admin card">
+                    <h3>Janji Temu Mendatang</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Pasien</th>
+                                <th>Dokter</th>
+                                <th>Layanan</th>
+                                <th>Tanggal</th>
+                                <th>Waktu</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="upcomingAppointmentsAdminBody">
+                            <tr><td colspan="7" class="text-center">Tidak ada janji temu mendatang.</td></tr>
+                            </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+            <section class="content-section hidden" id="user-list-section">
+                <div class="section-header">
+                    <h2>Daftar Pengguna</h2>
+                    <button class="btn btn-primary" id="addUserBtn"><i class="fas fa-plus"></i> Tambah Pengguna Baru</button>
+                </div>
+                <div class="filter-controls">
+                    <input type="text" id="userSearch" placeholder="Cari pengguna...">
+                    <select id="userLevelFilter">
+                        <option value="">Semua Level</option>
+                        <option value="1">Admin</option>
+                        <option value="2">Dokter</option>
+                        <option value="3">Staff</option>
+                        <option value="4">Pasien</option>
+                    </select>
+                    <select id="userStatusFilter">
+                        <option value="">Semua Status</option>
+                        <option value="1">Valid</option>
+                        <option value="2">Belum Valid</option>
+                        <option value="3">Keluar</option>
+                    </select>
+                </div>
+                <div class="data-table-container card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Nama Lengkap</th>
+                                <th>Level</th>
+                                <th>Status</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userListBody">
+                            <tr><td colspan="7" class="text-center">Memuat data...</td></tr>
+                            </tbody>
+                    </table>
+                    <div class="pagination">
+                        </div>
+                </div>
+            </section>
+            
+            <section class="content-section hidden" id="add-user-section">
+                <h2>Tambah Pengguna Baru</h2>
+                <div class="auth-container card"> <form id="addUserForm" class="auth-form">
                         <div class="form-group">
-                            <label for="addUser_nama_lengkap">Nama Lengkap:</label>
+                            <label for="addUser_nama_lengkap">Nama Lengkap</label>
                             <input type="text" id="addUser_nama_lengkap" name="nama_lengkap" required>
                         </div>
                         <div class="form-group">
-                            <label for="addUser_email">Email:</label>
+                            <label for="addUser_email">Email</label>
                             <input type="email" id="addUser_email" name="email" required>
                         </div>
-                    </div>
-                    <div class="form-row">
                         <div class="form-group">
-                            <label for="addUser_username">Username:</label>
+                            <label for="addUser_username">Username</label>
                             <input type="text" id="addUser_username" name="username" required>
                         </div>
                         <div class="form-group">
-                            <label for="addUser_password">Password:</label>
+                            <label for="addUser_password">Password</label>
                             <input type="password" id="addUser_password" name="password" required>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="addUser_id_level_user">Level Pengguna:</label>
-                        <select id="addUser_id_level_user" name="id_level_user" required>
-                            <option value="1">Admin</option>
-                            <option value="2">Dokter</option>
-                            <option value="3">Staff</option>
-                            <option value="4">Pasien</option>
-                        </select>
-                    </div>
-                    <button type="submit">Tambahkan Pengguna</button>
-                </form>
-            </div>
+                        <div class="form-group">
+                            <label for="addUser_id_level_user">Level Pengguna</label>
+                            <select id="addUser_id_level_user" name="id_level_user" required>
+                                <option value="1">Admin</option>
+                                <option value="2">Dokter</option>
+                                <option value="3">Staff</option>
+                                <option value="4">Pasien</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-full-width">Tambahkan Pengguna</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
 
-            <h4>Daftar Pengguna</h4>
-            <table class="user-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Nama Lengkap</th>
-                        <th>Level</th>
-                        <th>Status</th>
-                        <th>Aksi</th>
-                    </tr>
-                </thead>
-                <tbody id="userListBody">
-                    </tbody>
-            </table>
-        </div>
+<section class="content-section hidden" id="doctor-management-section">
+    <div class="section-header">
+        <h2>Manajemen Dokter</h2>
+        <button class="btn btn-primary" id="addDoctorBtn"><i class="fas fa-plus"></i> Tambah Dokter Baru</button>
     </div>
+    <div class="data-table-container card">
+        <table class="data-table">
+            <thead>              
+                <tr>
+                    <th>ID Dokter</th>
+                    <th>ID User</th>
+                    <th>Nama Dokter</th>
+                    <th>Spesialisasi</th>
+                    <th>Email</th>
+                    <th>No. Telepon</th>
+                    <th>No. Lisensi</th>
+                    <th>Pengalaman (Thn)</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>             
+            <tbody id="doctorListBody">
+            </tbody>             
+        </table>             
+    </div>
+</section>
+
+            <section class="content-section hidden" id="service-management-section">
+                <h2>Manajemen Layanan</h2>
+                <p>Konten untuk mengelola layanan klinik akan ditampilkan di sini.</p>
+                </section>
+
+            <section class="content-section hidden" id="appointment-management-section">
+                <h2>Manajemen Janji Temu</h2>
+                <p>Konten untuk mengelola janji temu akan ditampilkan di sini.</p>
+                </section>
+
+            <section class="content-section hidden" id="clinic-settings-section">
+                <h2>Pengaturan Klinik</h2>
+                <p>Konten untuk pengaturan umum klinik akan ditampilkan di sini.</p>
+            </section>
+        </main>
+    </div>
+
     <script src="/js/script.js"></script>
+    <script>
+        // Memastikan fetchDashboardData dan fetchUsers dipanggil saat dashboard dimuat
+        document.addEventListener('DOMContentLoaded', () => {
+            const currentPath = window.location.pathname;
+            if (currentPath === '/admin/dashboard') {
+                fetchDashboardData(); // Memuat data ringkasan dashboard
+                fetchUsers(); // Memuat daftar pengguna untuk tabel
+            }
+
+           
+            // Logika untuk menampilkan/menyembunyikan section konten
+            const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+            const submenus = document.querySelectorAll('.sidebar-nav .submenu a');
+            const contentSections = document.querySelectorAll('.main-content .content-section');
+            const pageTitleElement = document.getElementById('pageTitle'); // Ganti nama variabel agar lebih jelas
+            const addUserBtn = document.getElementById('addUserBtn');
+
+            function showSection(sectionIdToShow) {
+                console.log(`showSection called for: ${sectionIdToShow}`); // Untuk debugging
+
+                contentSections.forEach(section => {
+                section.classList.add('hidden');
+            });
+            const currentSectionElement = document.getElementById(sectionIdToShow);
+            if (currentSectionElement) {
+                currentSectionElement.classList.remove('hidden');
+
+                // Update judul halaman dengan lebih aman
+                let titleText = 'Dashboard Admin'; // Default
+                const navLink = document.querySelector(`.nav-item[data-section="${sectionIdToShow.replace('-section', '')}"] > a, .submenu li[data-subsection="${sectionIdToShow.replace('-section', '')}"] > a`);
+                if (navLink) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = navLink.innerHTML;
+                    const iconInLink = tempDiv.querySelector('i.submenu-icon');
+                    if (iconInLink) iconInLink.remove(); // Hapus ikon chevron dari judul
+                    titleText = tempDiv.textContent.trim();
+                } else if (sectionIdToShow === 'add-user-section') {
+                    titleText = 'Tambah Pengguna Baru';
+                }
+                if(pageTitleElement) pageTitleElement.textContent = titleText;
+
+
+                // Memanggil fungsi fetch data yang sesuai DARI script.js
+                if (sectionIdToShow === 'overview-section') {
+                    // fetchDashboardData() sudah dipanggil saat load awal script.js
+                    // Mungkin tidak perlu dipanggil ulang di sini kecuali ada kebutuhan refresh
+                    console.log('Displaying overview section.');
+                } else if (sectionIdToShow === 'user-list-section') {
+                    console.log('Attempting to call fetchUsers for section:', sectionIdToShow);
+                    if (typeof fetchUsers === 'function') {
+                        fetchUsers();
+                    } else {
+                        console.error('fetchUsers function is not defined!');
+                    }
+                } else if (sectionIdToShow === 'add-user-section') {
+                    console.log('Displaying add user section.');
+                    // Biasanya tidak ada data yang perlu di-fetch untuk form tambah pengguna
+                } else if (sectionIdToShow === 'doctor-management-section') { // INI YANG PENTING
+                    console.log('Attempting to call fetchDoctors for section:', sectionIdToShow);
+                    if (typeof fetchDoctors === 'function') {
+                        fetchDoctors(); // Panggil fetchDoctors dari script.js
+                    } else {
+                        console.error('fetchDoctors function is not defined!');
+                    }
+                } else if (sectionIdToShow === 'service-management-section') {
+                    console.log('Attempting to call fetchServices for section:', sectionIdToShow);
+                }  
+            } else {
+                console.warn(`showSection: Section with ID '${sectionIdToShow}' not found.`);
+            }
+        }
+
+        // Handler untuk menu utama (nav-item)
+        navItems.forEach(item => {
+            const link = item.querySelector('a'); // Ambil elemen <a> di dalam <li>
+            if (!link) return;
+
+            link.addEventListener('click', function(e) {
+                const parentNavItem = this.closest('.nav-item'); // .nav-item dari link yang diklik
+
+                if (parentNavItem.classList.contains('has-submenu')) {
+                    e.preventDefault();
+                    parentNavItem.classList.toggle('active');
+                    const submenuElement = parentNavItem.querySelector('.submenu');
+                    if (submenuElement) {
+                        submenuElement.classList.toggle('active');
+                    }
+                } else if (parentNavItem.dataset.section) {
+                    e.preventDefault();
+                    navItems.forEach(nav => nav.classList.remove('active'));
+                    document.querySelectorAll('.submenu.active').forEach(sm => sm.classList.remove('active'));
+                    document.querySelectorAll('.nav-item .submenu li.active-submenu-item').forEach(si => si.classList.remove('active-submenu-item'));
+                    
+                    parentNavItem.classList.add('active');
+                    showSection(parentNavItem.dataset.section + '-section');
+                }
+            });
+        });
+
+        // Handler untuk submenu (Daftar Pengguna, Tambah Pengguna Baru)
+        submenus.forEach(submenuLink => { // submenuLink adalah elemen <a> di dalam .submenu li
+            submenuLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation(); // Mencegah event klik menyebar ke parent .nav-item
+
+                navItems.forEach(nav => nav.classList.remove('active')); // Nonaktifkan semua menu utama dulu
+                submenus.forEach(subLink => subLink.closest('li').classList.remove('active-submenu-item')); // Nonaktifkan semua item submenu
+
+                const currentSubmenuLi = this.closest('li'); // <li> dari item submenu yang diklik
+                const parentNavItemWithSubmenu = this.closest('.nav-item.has-submenu');
+
+                if (currentSubmenuLi) currentSubmenuLi.classList.add('active-submenu-item');
+                if (parentNavItemWithSubmenu) {
+                    parentNavItemWithSubmenu.classList.add('active'); // Aktifkan parent menu
+                    const submenuElement = parentNavItemWithSubmenu.querySelector('.submenu');
+                    if (submenuElement) submenuElement.classList.add('active'); // Pastikan submenu tetap terbuka
+                }
+                
+                const subsectionId = currentSubmenuLi.dataset.subsection;
+                if (subsectionId === 'user-list') {
+                    showSection('user-list-section');
+                } else if (subsectionId === 'add-user') {
+                    showSection('add-user-section');
+                }
+            });
+        });
+
+        // Tombol "Tambah Pengguna Baru" di header section "Daftar Pengguna"
+        if (addUserBtn) {
+            addUserBtn.addEventListener('click', () => {
+                navItems.forEach(nav => nav.classList.remove('active'));
+                submenus.forEach(subLink => subLink.closest('li').classList.remove('active-submenu-item'));
+                
+                const userManagementMenu = document.querySelector('.nav-item[data-section="user-management"]');
+                if (userManagementMenu) {
+                    userManagementMenu.classList.add('active');
+                    const submenuElement = userManagementMenu.querySelector('.submenu');
+                    if (submenuElement) submenuElement.classList.add('active');
+                    const addUserSubmenuItem = userManagementMenu.querySelector('li[data-subsection="add-user"]');
+                    if (addUserSubmenuItem) addUserSubmenuItem.classList.add('active-submenu-item');
+                }
+                showSection('add-user-section');
+            });
+        }
+
+        // Inisialisasi tampilan awal (Dashboard Overview)
+        const initialActiveItem = document.querySelector('.sidebar-nav .nav-item.active');
+        if (initialActiveItem && initialActiveItem.dataset.section) {
+            showSection(initialActiveItem.dataset.section + '-section');
+        } else {
+            // Default ke overview jika tidak ada yang aktif
+            const overviewItem = document.querySelector('.nav-item[data-section="overview"]');
+            if (overviewItem) {
+                overviewItem.classList.add('active');
+                showSection('overview-section');
+            }
+        }
+    });
+</script>
 </body>
 </html>

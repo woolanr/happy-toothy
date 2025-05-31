@@ -219,6 +219,22 @@ const userController = {
         }
     },
 
+    getAllDoctors: async (req, res) => {
+        console.log('userController: getAllDoctors called.');
+        try {
+            const doctors = await User.findAllDoctors();
+
+            console.log('userController: getAllDoctors - Doctors received from model:', doctors.length);
+            res.status(200).json({ success: true, data: doctors });
+            console.log('userController: getAllDoctors - Response sent.');
+            
+        } catch (error) {
+            console.error('userController: Error in getAllDoctors:', error);
+            console.error('Error Stack:', error.stack); 
+            res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat mengambil daftar dokter.' });
+        }
+    },
+
     getPatientDashboardData: async (req, res) => {
         console.log('userController: getPatientDashboardData called.');
         const id_patient = req.user.id_user; 

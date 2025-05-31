@@ -608,6 +608,90 @@ async function handleVerifyUser(event) {
     }
 }
 
+async function fetchDoctors() {
+    try {
+        console.log('script.js (fetchDoctors): Fetching doctors data...');
+        const response = await fetch('/admin/doctors', { 
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        const result = await response.json();
+        console.log('script.js (fetchDoctors): API Response result:', result); // <-- Log hasil JSON dari backend
+
+        const doctorListBody = document.getElementById('doctorListBody');
+        console.log('script.js (fetchDoctors): doctorListBody element:', doctorListBody); // <-- Log elemen tbody
+
+        if (response.ok && result.success && result.data && doctorListBody) {
+            populateDoctorTable(result.data);
+        } else if (response.status === 401 || response.status === 403) {
+            alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        } else {
+            console.error('script.js (fetchDoctors): Conditions check failed:');
+            console.error('  response.ok:', response.ok);
+            console.error('  result.success:', result.success);
+            console.error('  result.data:', result.data);
+            console.error('  doctorListBody exists:', !!doctorListBody);
+
+            console.error('script.js (fetchDoctors): Failed to fetch doctors -', result.message);
+            if (doctorListBody) {
+                doctorListBody.innerHTML = `<tr><td colspan="5" class="text-center">${result.message || 'Gagal memuat data dokter (data tidak valid).'}</td></tr>`;
+            } else { 
+                 alert(result.message || 'Gagal memuat data dokter (elemen tabel tidak ditemukan).');
+            }
+        }
+    } catch (error) {
+        console.error('script.js (fetchDoctors): Error fetching doctors:', error);
+        const doctorListBody = document.getElementById('doctorListBody');
+        if (doctorListBody) {
+            doctorListBody.innerHTML = `<tr><td colspan="5" class="text-center">Terjadi kesalahan saat memuat data dokter.</td></tr>`;
+        } else {
+            alert('Terjadi kesalahan saat memuat data dokter.');
+        }
+    }
+}
+
+function populateDoctorTable(doctors) {
+    console.log('populateDoctorTable called with doctors:', doctors);
+
+    const doctorListBody = document.getElementById('doctorListBody');
+    if (!doctorListBody) {
+        console.error("populateDoctorTable: Element with ID 'doctorListBody' not found.");
+        return;
+    }
+
+    doctorListBody.innerHTML = ''; 
+
+    if (doctors && doctors.length > 0) {
+        console.log('populateDoctorTable: Processing doctors data to create table rows.');
+        doctors.forEach(doctor => {
+            const row = doctorListBody.insertRow();
+            
+            const rowHTML = `
+                <td>${doctor.id_doctor || 'N/A'}</td> 
+                <td>${doctor.id_user || 'N/A'}</td> 
+                <td>${doctor.nama_lengkap || 'N/A'}</td>
+                <td>${doctor.spesialisasi || '-'}</td>
+                <td>${doctor.email || '-'}</td> 
+                <td>${doctor.no_telepon || '-'}</td>
+                <td>${doctor.lisensi_no || '-'}</td>
+                <td>${doctor.pengalaman_tahun !== null ? doctor.pengalaman_tahun : '-'}</td>
+                <td class="user-actions"> 
+                    <button class="edit-btn" data-id="${doctor.id_doctor}">Edit</button>
+                    <button class="delete-btn" data-id="${doctor.id_doctor}">Hapus</button>
+                </td>
+            `;
+            row.innerHTML = rowHTML;
+            console.log('populateDoctorTable: Added row - HTML:', rowHTML);
+
+        });
+    } else {
+        console.log('populateDoctorTable: No doctors data to display. Showing "Tidak ada data dokter."');
+        doctorListBody.innerHTML = '<tr><td colspan="9" class="text-center">Tidak ada data dokter.</td></tr>';
+    }
+}
+
 async function fetchPatientDashboardData() {
     try {
         console.log('script.js (fetchPatientDashboardData): Fetching patient dashboard data...');
@@ -828,10 +912,8 @@ async function handleNewAppointmentFormSubmit(event) {
 
 // --- Event listener utama untuk DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('script.js (DOMContentLoaded): DOM fully loaded and parsed.');
 
     // --- Inisialisasi Event Listeners untuk Formulir (Anda sudah punya ini) ---
-    // Pastikan ID form di HTML Anda sesuai dengan yang dipanggil di sini
     const loginForm = document.querySelector('#loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', handleLoginFormSubmit);
@@ -931,7 +1013,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         fetchDashboardData();
-        fetchUsers();
     } else if (currentPath === '/pasien/dashboard') {
         console.log('script.js (DOMContentLoaded): On patient dashboard page. Attempting to fetch data.');
         const token = getToken();
