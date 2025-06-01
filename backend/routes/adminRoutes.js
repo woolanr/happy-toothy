@@ -43,7 +43,12 @@ router.post('/admin/doctors', protect, authorizeRoles([1]), userController.creat
 router.get('/admin/doctors/:id', protect, authorizeRoles([1]), userController.getDoctorByIdForEdit);
 router.put('/admin/doctors/:id', protect, authorizeRoles([1]), userController.updateDoctor);
 router.put('/admin/doctors/:id/deactivate', protect, authorizeRoles([1]), userController.deactivateDoctorAccount);
-console.log('AdminRoutes: Registered PUT /admin/doctors/:id/deactivate');
+
+// --- Route API untuk Manajemen Pengguna ---
+router.put('/admin/users/:id/activate', protect, authorizeRoles([1]), userController.activateUserAccount);
+console.log('AdminRoutes: Registered PUT /admin/users/:id/activate');
+router.put('/admin/users/:id/verify', protect, authorizeRoles([1]), userController.verifyUserAccount);
+console.log('AdminRoutes: Registered PUT /admin/users/:id/verify');
 
 // --- Route untuk Booking (oleh Pasien) ---
 // ... (rute booking) ...

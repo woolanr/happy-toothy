@@ -223,52 +223,106 @@ const userController = {
 
     // Fungsi untuk mengupdate data pengguna (oleh admin)
     updateUser: async (req, res) => {
-        console.log('userController: updateUser called.');
-        const userId = req.params.id;
-        const { nama_lengkap, email, username, id_level_user, id_status_valid } = req.body;
+        const userId = req.params.id; // ID dari user yang akan diupdate (dari tabel USERS)
+        console.log(`userController: updateUser called for userId: ${userId}`);
+        const { 
+            userData,         // Berisi: username, email, password (opsional), id_level_user, id_status_valid
+            profileData,      // Berisi: nama_lengkap, email, no_telepon
+            doctorData,       // Berisi: spesialisasi, lisensi_no, pengalaman_tahun (bisa null jika bukan dokter)
+            current_id_level_user // Level user sebelum diedit
+        } = req.body;
 
-        if (!userId) {
-            return res.status(400).json({ message: 'ID pengguna diperlukan untuk update.' });
+        console.log('Received userData for update:', userData);
+        console.log('Received profileData for update:', profileData);
+        console.log('Received doctorData for update:', doctorData);
+        console.log('Received current_id_level_user:', current_id_level_user);
+
+        // 1. Validasi Input Dasar
+        if (!userData || !profileData || !userData.username || !userData.email || !profileData.nama_lengkap) {
+            return res.status(400).json({ success: false, message: 'Data pengguna tidak lengkap (username, email, nama lengkap wajib diisi).' });
+        }
+        if (userData.id_level_user === 2 && (!doctorData || !doctorData.spesialisasi || !doctorData.lisensi_no || doctorData.pengalaman_tahun === undefined || doctorData.pengalaman_tahun === null)) {
+            return res.status(400).json({ success: false, message: 'Jika level adalah Dokter, data spesialisasi, lisensi, dan pengalaman wajib diisi.' });
         }
 
         try {
-            const user = await User.findById(userId); 
-            if (!user) {
-                return res.status(404).json({ message: 'Pengguna tidak ditemukan.' });
+            const existingUser = await User.findById(userId); // User.findById sudah di-JOIN dengan PROFILE dan DOCTORS
+            if (!existingUser) {
+                return res.status(404).json({ success: false, message: 'Pengguna yang akan diupdate tidak ditemukan.' });
+            }
+            const actualProfileId = existingUser.id_profile; // Gunakan id_profile dari DB
+
+            // 3. Cek duplikasi username jika diubah
+            if (userData.username && userData.username !== existingUser.username) {
+                const otherUserWithUsername = await User.findByUsername(userData.username);
+                // Pastikan otherUserWithUsername[0] ada sebelum akses id_user
+                if (otherUserWithUsername && otherUserWithUsername.length > 0 && otherUserWithUsername[0].id_user !== parseInt(userId)) {
+                    return res.status(409).json({ success: false, message: 'Username sudah digunakan oleh pengguna lain.' });
+                }
+            }
+
+            // 4. Cek duplikasi email jika diubah
+            if (userData.email && userData.email !== existingUser.email) {
+                const otherUserWithEmail = await User.findByEmail(userData.email);
+                // Pastikan otherUserWithEmail[0] ada sebelum akses id_user
+                if (otherUserWithEmail && otherUserWithEmail.length > 0 && otherUserWithEmail[0].id_user !== parseInt(userId)) {
+                    return res.status(409).json({ success: false, message: 'Email sudah digunakan oleh pengguna lain.' });
+                }
             }
             
-            const updatedUserData = {};
-            const updatedProfileData = {};
-
-            if (username !== undefined) updatedUserData.username = username;
-            if (email !== undefined) {
-                updatedUserData.email = email;
-                updatedProfileData.email = email; 
-            }
-            if (id_level_user !== undefined) updatedUserData.id_level_user = parseInt(id_level_user); 
-            if (id_status_valid !== undefined) updatedUserData.id_status_valid = parseInt(id_status_valid); 
-            if (nama_lengkap !== undefined) updatedProfileData.nama_lengkap = nama_lengkap;
-
-            // Lakukan update ke tabel USERS
-            if (Object.keys(updatedUserData).length > 0) {
-                await User.updateUser(userId, updatedUserData); 
+            // 5. Siapkan data final untuk update, hash password jika ada
+            const finalUserData = { ...userData }; // Salin userData
+            if (userData.password && userData.password.trim() !== '') {
+                finalUserData.password = await bcrypt.hash(userData.password, 10);
+            } else {
+                delete finalUserData.password; // Jangan update password jika kosong
             }
 
-            // Lakukan update ke tabel PROFILE (jika ada perubahan dan id_profile tersedia)
-            if (Object.keys(updatedProfileData).length > 0 && user.id_profile) {
-                 await User.updateProfile(user.id_profile, updatedProfileData); // Ini masih butuh User.updateProfile
+            if (Object.keys(finalUserData).length > 0) {
+                await User.updateUser(userId, finalUserData);
+                console.log(`userController: Data di tabel USERS untuk id_user ${userId} telah diupdate.`);
             }
 
-            res.status(200).json({ message: 'Pengguna berhasil diperbarui.' });
-            console.log('userController: updateUser - User data updated successfully.');
+            // Update tabel PROFILE (menggunakan actualProfileId dari DB)
+            if (actualProfileId && profileData && Object.keys(profileData).length > 0) {
+                await User.updateProfile(actualProfileId, profileData);
+                console.log(`userController: Data di tabel PROFILE untuk id_profile ${actualProfileId} telah diupdate.`);
+            }
+
+            // Logika untuk menangani data dokter berdasarkan perubahan level
+            const newLevelUser = finalUserData.id_level_user; // Level baru dari form
+            const oldLevelUser = parseInt(current_id_level_user);    // Level lama dari hidden input
+
+            if (newLevelUser === 2 && doctorData) { // Jika levelnya Dokter dan ada data dokter
+                const existingDoctorEntry = await User.findDoctorRecordByUserId(userId);
+
+                if (existingDoctorEntry) {
+                    // User ini sudah dokter, jadi UPDATE data dokternya
+                    console.log(`User ${userId} (dokter ID: ${existingDoctorEntry.id_doctor}) diupdate detail dokternya.`);
+                    await User.updateDoctorDetails(existingDoctorEntry.id_doctor, doctorData);
+                } else if (oldLevelUser !== 2) {
+                    // User ini BARU diubah menjadi dokter (sebelumnya bukan dokter), jadi INSERT data dokter baru
+                    console.log(`User ${userId} dipromosikan menjadi Dokter. Membuat entri dokter baru.`);
+                    await User.createDoctorEntryForUser(userId, doctorData);
+                } else {
+                    // Kasus aneh: levelnya dokter, ada data dokter, tapi tidak ada entri dokter sebelumnya
+                    // Ini seharusnya tidak terjadi jika create doctor awal benar.
+                    // Bisa jadi ini user yang levelnya sudah 2 tapi belum ada data di tabel DOCTORS
+                    console.warn(`User ${userId} memiliki level Dokter tapi tidak ada entri di tabel DOCTORS. Mencoba membuat entri baru.`);
+                    await User.createDoctorEntryForUser(userId, doctorData);
+                }
+            } else if (oldLevelUser === 2 && newLevelUser !== 2) {
+                // User ini sebelumnya dokter, tapi sekarang levelnya diubah BUKAN menjadi dokter
+                console.log(`User ${userId} (sebelumnya Dokter) diubah levelnya menjadi ${newLevelUser}.`);
+                await User.deleteDoctorEntryByUserId(userId);
+            }
+
+            res.status(200).json({ success: true, message: 'Pengguna berhasil diperbarui.' });
+            console.log('userController: updateUser - User data updated successfully (termasuk potensi perubahan role/detail dokter).');
 
         } catch (error) {
-            console.error('userController: Error updating user:', error);
-            console.error('Error Stack:', error.stack);
-            if (error.code === 'ER_DUP_ENTRY') {
-                return res.status(409).json({ message: 'Username atau email sudah terdaftar.' });
-            }
-            res.status(500).json({ message: 'Gagal memperbarui pengguna.' });
+            console.error('userController: Error in updateUser:', error);
+            res.status(500).json({ success: false, message: error.message || 'Gagal memperbarui pengguna.' });
         }
     },
     
@@ -299,7 +353,7 @@ const userController = {
                 return res.status(404).json({ success: false, message: 'Dokter yang akan diupdate tidak ditemukan.' });
             }
             const userId = existingDoctorData.id_user; // id_user dari dokter yang akan diupdate
-            const profileId = existingDoctorData.id_profile; // id_profile dari dokter yang akan diupdate
+            const profileId = existingDoctorData.id_profile;
 
             // 3. Cek duplikasi username/email jika diubah dan bukan milik user saat ini
             if (username && username !== existingDoctorData.username) {
@@ -371,6 +425,53 @@ const userController = {
         } catch (error) {
             console.error(`userController: Error in deactivateDoctorAccount for doctorId ${doctorId}:`, error);
             res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat menonaktifkan akun dokter.' });
+        }
+    },
+
+    activateUserAccount: async (req, res) => {
+        const userId = req.params.id; // Ini adalah id_user dari tabel USERS
+        console.log(`userController: activateUserAccount called for userId: ${userId}`);
+
+        try {
+            // Kita akan menggunakan method User.updateStatusValid yang sudah ada di modelmu
+            const statusAktif = 1; // Status untuk "Valid"
+            const result = await User.updateStatusValid(userId, statusAktif);
+
+            if (result.affectedRows > 0) {
+                res.status(200).json({ success: true, message: 'Akun pengguna berhasil diaktifkan kembali.' });
+                console.log(`userController: User account activated successfully for userId: ${userId}`);
+            } else {
+                // Ini bisa terjadi jika user dengan ID tersebut tidak ditemukan atau statusnya sudah aktif.
+                res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan atau akun sudah aktif.' });
+                console.log(`userController: User not found or already active for userId: ${userId}`);
+            }
+        } catch (error) {
+            console.error(`userController: Error in activateUserAccount for userId ${userId}:`, error);
+            res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat mengaktifkan akun pengguna.' });
+        }
+    },
+
+    verifyUserAccount: async (req, res) => {
+        const userId = req.params.id;
+        console.log(`userController: verifyUserAccount called for userId: ${userId}`);
+
+        try {
+            const statusValid = 1; // Status untuk "Valid"
+            // Kita bisa langsung menggunakan User.updateStatusValid yang sudah ada
+            const result = await User.updateStatusValid(userId, statusValid);
+
+            if (result.affectedRows > 0) {
+                res.status(200).json({ success: true, message: 'Pengguna berhasil diverifikasi.' });
+                console.log(`userController: User account verified successfully for userId: ${userId}`);
+            } else {
+                // Ini bisa terjadi jika user dengan ID tersebut tidak ditemukan 
+                // atau statusnya sudah 'Valid' (jika query updateStatusValid mencegah update jika status sama)
+                res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan atau status tidak berubah.' });
+                console.log(`userController: User not found or status not changed for userId: ${userId}`);
+            }
+        } catch (error) {
+            console.error(`userController: Error in verifyUserAccount for userId ${userId}:`, error);
+            res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat memverifikasi pengguna.' });
         }
     },
 

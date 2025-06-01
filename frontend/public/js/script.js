@@ -3,8 +3,6 @@
 // --- Bagian Awal: Fungsi Global (getToken, getAuthHeaders) ---
 function getToken() {
     const token = localStorage.getItem('token');
-    // Log token hanya sebagian untuk keamanan di console
-    console.log('script.js (global): getToken() retrieved token:', token ? token.substring(0, 10) + '...' : 'null');
     return token;
 }
 
@@ -14,8 +12,6 @@ function getAuthHeaders() {
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
         console.log('script.js (global): getAuthHeaders() returning WITH Authorization header.');
-    } else {
-        console.log('script.js (global): getAuthHeaders() returning WITHOUT Authorization header (token is null/empty).');
     }
     return headers;
 }
@@ -282,16 +278,6 @@ async function handleResetPasswordFormSubmit(event) {
     }
 }
 
-// --- Fungsi Logout ---
-const logoutButton = document.getElementById('logoutButton');
-if (logoutButton) {
-    logoutButton.addEventListener('click', () => {
-        localStorage.removeItem('token'); 
-        alert('Anda telah logout.');
-        window.location.href = '/login';
-    });
-}
-
 // --- Fungsi Helper Dashboard Admin ---
 function getLevelName(id_level_user) {
     switch (id_level_user) {
@@ -376,7 +362,7 @@ async function fetchUsers() {
                 } else {
                     actionButtons = `
                         <button class="btn btn-sm btn-edit edit-btn" data-id="${user.id_user}">Edit</button>
-                        <button class="btn btn-sm btn-danger delete-btn" data-id="${user.id_user}">Nonaktifkan</button> 
+                        <button class="btn btn-sm btn-danger delete-btn" data-id="${user.id_user}" data-userid="${user.id_user}">Nonaktifkan</button> 
                         ${user.id_status_valid !== 1 ? `<button class="btn btn-sm btn-warning verify-btn" data-id="${user.id_user}">Verifikasi</button>` : ''}
                     `;
                 }
@@ -389,20 +375,19 @@ async function fetchUsers() {
                     <td>${getLevelName(user.id_level_user)}</td>
                     <td>${getStatusName(user.id_status_valid)}</td>
                     <td class="user-actions">
-                        <button class="edit-btn" data-id="${user.id_user}">Edit</button>
-                        <button class="delete-btn" data-id="${user.id_user}">Hapus</button>
-                        ${user.id_status_valid !== 1 ? `<button class="verify-btn" data-id="${user.id_user}">Verifikasi</button>` : ''}
+                        ${actionButtons}
                     </td>
                 `;
             });
 
-            document.querySelectorAll('.edit-btn').forEach(button => {
+            // Re-attach event listeners
+            document.querySelectorAll('#userListBody .edit-btn').forEach(button => {
                 button.addEventListener('click', handleEditUser);
             });
-            document.querySelectorAll('.delete-btn').forEach(button => {
-                button.addEventListener('click', handleDeleteUser);
+            document.querySelectorAll('#userListBody .delete-btn').forEach(button => {
+                button.addEventListener('click', handleDeleteUser); // Ini untuk menonaktifkan user umum
             });
-            document.querySelectorAll('.verify-btn').forEach(button => {
+            document.querySelectorAll('#userListBody .verify-btn').forEach(button => {
                 button.addEventListener('click', handleVerifyUser);
             });
             document.querySelectorAll('#userListBody .activate-btn').forEach(button => {
@@ -427,6 +412,13 @@ async function fetchUsers() {
 }
 
 function createEditUserModal(user) {
+    console.log("createEditUserModal called with user data:", user);
+    // Hapus modal lama jika ada (untuk menghindari duplikasi jika error sebelumnya tidak menghapus)
+    const existingModal = document.getElementById('editUserModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
     const modal = document.createElement('div');
     modal.id = 'editUserModal';
     modal.style.cssText = `
@@ -435,22 +427,37 @@ function createEditUserModal(user) {
         justify-content: center; align-items: center; z-index: 1000;
     `;
 
+    // Ambil data dokter dari objek user jika ada (karena User.findById sudah di-JOIN dengan DOCTORS)
+    const initialSpesialisasi = user.spesialisasi || ''; 
+    const initialLisensiNo = user.lisensi_no || '';  
+    const initialPengalaman = user.pengalaman_tahun !== null ? user.pengalaman_tahun : ''; 
+
     modal.innerHTML = `
-        <div style="background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); max-width: 500px; width: 90%;">
+        <div style="background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
             <h3>Edit Pengguna</h3>
             <form id="editUserForm">
                 <input type="hidden" id="edit_id_user" value="${user.id_user}">
+                <input type="hidden" id="edit_id_profile" value="${user.id_profile || ''}">
+                <input type="hidden" id="edit_current_id_level_user" value="${user.id_level_user}">
                 <div class="form-group">
                     <label for="edit_nama_lengkap">Nama Lengkap:</label>
                     <input type="text" id="edit_nama_lengkap" name="nama_lengkap" value="${user.nama_lengkap || ''}" required>
                 </div>
                 <div class="form-group">
                     <label for="edit_email">Email:</label>
-                    <input type="email" id="edit_email" name="email" value="${user.email}" required>
+                    <input type="email" id="edit_email" name="email" value="${user.email || ''}" required>
                 </div>
                 <div class="form-group">
                     <label for="edit_username">Username:</label>
-                    <input type="text" id="edit_username" name="username" value="${user.username}" required>
+                    <input type="text" id="edit_username" name="username" value="${user.username || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_password">Password Baru (Opsional)</label>
+                    <input type="password" id="edit_password" name="password" placeholder="Kosongkan jika tidak ingin mengubah">
+                </div>
+                <div class="form-group">
+                    <label for="edit_no_telepon">No. Telepon (Opsional)</label>
+                    <input type="tel" id="edit_no_telepon" name="no_telepon" value="${user.no_telepon || ''}">
                 </div>
                 <div class="form-group">
                     <label for="edit_id_level_user">Level Pengguna:</label>
@@ -469,78 +476,208 @@ function createEditUserModal(user) {
                         <option value="3" ${user.id_status_valid === 3 ? 'selected' : ''}>Keluar</option>
                     </select>
                 </div>
-                <button type="submit" style="background-color: #28a745; margin-right: 10px;">Simpan Perubahan</button>
-                <button type="button" id="closeModalBtn" style="background-color: #dc3545;">Batal</button>
+
+                <div id="doctorSpecificFieldsContainer" style="display: none; border-top: 1px solid #eee; margin-top: 15px; padding-top: 15px;">
+                    <h4>Detail Spesifik Dokter:</h4>
+                    <div class="form-group">
+                        <label for="edit_spesialisasi">Spesialisasi:</label>
+                        <input type="text" id="edit_spesialisasi" name="spesialisasi" value="${initialSpesialisasi}">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_lisensi_no">No. Lisensi:</label>
+                        <input type="text" id="edit_lisensi_no" name="lisensi_no" value="${initialLisensiNo}">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_pengalaman_tahun">Pengalaman (Tahun):</label>
+                        <input type="number" id="edit_pengalaman_tahun" name="pengalaman_tahun" min="0" value="${initialPengalaman}">
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                    <button type="button" id="closeEditUserModalBtn" class="btn btn-secondary">Batal</button>
+                </div>
             </form>
         </div>
     `;
 
     document.body.appendChild(modal);
 
-    document.getElementById('closeModalBtn').addEventListener('click', () => {
-        modal.remove();
-    });
+    // --- Logika untuk menampilkan/menyembunyikan field dokter ---
+    const levelDropdown = document.getElementById('edit_id_level_user');
+    const doctorFieldsContainer = document.getElementById('doctorSpecificFieldsContainer');
+    const spesialisasiInput = document.getElementById('edit_spesialisasi');
+    const lisensiInput = document.getElementById('edit_lisensi_no');
+    const pengalamanInput = document.getElementById('edit_pengalaman_tahun');
+    const closeButton = document.getElementById('closeEditUserModalBtn');
+    const editForm = document.getElementById('editUserForm');
 
-    document.getElementById('editUserForm').addEventListener('submit', handleUpdateUser);
+    function toggleDoctorFields() {
+        if (!levelDropdown) {
+            console.error("Error di toggleDoctorFields: Elemen dropdown 'edit_id_level_user' tidak ditemukan!");
+            if (doctorFieldsContainer) doctorFieldsContainer.style.display = 'none';
+            return;
+        }
+        if (doctorFieldsContainer && spesialisasiInput && lisensiInput && pengalamanInput) {
+            if (levelDropdown.value === '2') { // Value '2' untuk Dokter
+                doctorFieldsContainer.style.display = 'block';
+                spesialisasiInput.required = true;
+                lisensiInput.required = true;
+                pengalamanInput.required = true;
+            } else {
+                doctorFieldsContainer.style.display = 'none';
+                spesialisasiInput.required = false;
+                lisensiInput.required = false;
+                pengalamanInput.required = false;
+            }
+        } else {
+        }
+    }
+
+    if (levelDropdown) {
+        toggleDoctorFields(); 
+        levelDropdown.addEventListener('change', toggleDoctorFields);
+    } else {
+        console.error("createEditUserModal: Elemen dropdown 'edit_id_level_user' tidak ditemukan setelah modal di-append.");
+    }
+    
+    if (closeButton) {
+        closeButton.addEventListener('click', () => {
+            modal.remove();
+        });
+    } else {
+        console.error("createEditUserModal: Tombol 'closeEditUserModalBtn' tidak ditemukan.");
+    }
+
+    if (editForm) {
+        editForm.addEventListener('submit', handleUpdateUser);
+    } else {
+        console.error("createEditUserModal: Form 'editUserForm' tidak ditemukan.");
+    }
 }
 
-async function handleEditUser(event) {
+async function handleEditUser(event) { // Dipanggil saat tombol "Edit" di tabel pengguna diklik
+    console.log('handleEditUser triggered. Event target:', event.target);
+
     const userId = event.target.dataset.id;
+    console.log('handleEditUser: Attempting to edit userId:', userId);
+
+    if (!userId) {
+        console.error('handleEditUser: userId is undefined or null. Button data-id might be missing or incorrect.');
+        alert('Gagal memulai proses edit: ID pengguna tidak ditemukan.');
+        return;
+    }
+
     try {
+        console.log(`handleEditUser: Fetching data for user ID: ${userId} from /admin/users/${userId}`);
+        
         const response = await fetch(`/admin/users/${userId}`, { 
             method: 'GET',
             headers: getAuthHeaders()
         });
-        const result = await response.json();
+        console.log('handleEditUser: Fetch response status:', response.status);
 
-        if (response.ok && result.users) { 
-            createEditUserModal(result.users);
+        let result;
+        try {
+            result = await response.json();
+            console.log('handleEditUser: Fetched user data result:', result); 
+        } catch (jsonError) {
+            console.error('handleEditUser: Error parsing JSON response:', jsonError);
+            const responseText = await response.text(); 
+            console.error('handleEditUser: Response text was:', responseText);
+            alert('Gagal memproses data pengguna dari server. Respons tidak valid.');
+            return;
+        }
+
+        if (response.ok && result.users) { // Backend mengirim { users: userObject }
+            createEditUserModal(result.users); // Panggil createEditUserModal dengan data yang diterima
         } else if (response.status === 401 || response.status === 403) {
             alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
             localStorage.removeItem('token');
             window.location.href = '/login';
         } else if (response.status === 404) {
-            alert('Pengguna tidak ditemukan.');
+            alert('Pengguna tidak ditemukan di server.');         
+            console.error('handleEditUser: User not found (404) for ID:', userId);
         } else {
             alert(result.message || 'Gagal memuat data pengguna untuk diedit.');
+            console.error('handleEditUser: Failed to load user data, result:', result);
         }
     } catch (error) {
+        // Ini akan menangkap error jaringan atau error dari throw di try-catch JSON parsing
         console.error('script.js (handleEditUser): Error fetching user for edit:', error);
         alert('Terjadi kesalahan saat memuat data pengguna untuk diedit.');
     }
 }
 
-async function handleUpdateUser(event) {
+async function handleUpdateUser(event) { // Ini fungsi untuk SUBMIT dari modal edit PENGGUNA UMUM
     event.preventDefault();
-    const form = event.target;
+    const form = event.target; // form adalah #editUserForm dari modal dinamis
     const userId = document.getElementById('edit_id_user').value;
+    const profileId = document.getElementById('edit_id_profile').value;
+    const currentLevelUser = document.getElementById('edit_current_id_level_user').value; // Ambil level awal
 
-    const updatedData = {
-        nama_lengkap: form.nama_lengkap.value,
-        email: form.email.value,
-        username: form.username.value,
-        id_level_user: parseInt(form.id_level_user.value),
-        id_status_valid: parseInt(form.id_status_valid.value)
+    // Persiapkan data untuk tabel USERS
+    const updatedUserData = {
+        username: form.edit_username.value,
+        email: form.edit_email.value,
+        id_level_user: parseInt(form.edit_id_level_user.value),
+        id_status_valid: parseInt(form.edit_id_status_valid.value)
     };
+    if (form.edit_password && form.edit_password.value) { // Cek jika elemen password ada
+        updatedUserData.password = form.edit_password.value;
+    }
+
+    // Persiapkan data untuk tabel PROFILE
+    const updatedProfileData = {
+        nama_lengkap: form.edit_nama_lengkap.value,
+        email: form.edit_email.value, 
+        no_telepon: form.edit_no_telepon.value || null
+    };
+
+    // Persiapkan data spesifik dokter JIKA levelnya adalah Dokter (2)
+    let doctorSpecificData = null;
+    if (updatedUserData.id_level_user === 2) {
+        const spesialisasi = form.edit_spesialisasi ? form.edit_spesialisasi.value : null;
+        const lisensi_no = form.edit_lisensi_no ? form.edit_lisensi_no.value : null;
+        const pengalaman_tahun_val = form.edit_pengalaman_tahun ? form.edit_pengalaman_tahun.value : null;
+
+        if (!spesialisasi || !lisensi_no || pengalaman_tahun_val === null || pengalaman_tahun_val === '') {
+            alert('Untuk level Dokter, field Spesialisasi, No. Lisensi, dan Pengalaman wajib diisi.');
+            return;
+        }
+        doctorSpecificData = {
+            spesialisasi: spesialisasi,
+            lisensi_no: lisensi_no,
+            pengalaman_tahun: parseInt(pengalaman_tahun_val)
+        };
+    }
+
+    const dataToSend = {
+        userData: updatedUserData,
+        profileData: updatedProfileData,
+        doctorData: doctorSpecificData, 
+        id_profile: profileId,
+        current_id_level_user: parseInt(currentLevelUser) // Kirim level awal untuk logika backend
+    };
+    console.log('Data yang dikirim untuk update pengguna (handleUpdateUser):', dataToSend);
     
     try {
-        const response = await fetch(`/admin/users/${userId}`, {
+        // Endpoint ini (/admin/users/:id) akan ditangani oleh userController.updateUser
+        // userController.updateUser perlu dirombak untuk menangani dataToSend yang kompleks ini
+        const response = await fetch(`/admin/users/${userId}`, { 
             method: 'PUT',
             headers: getAuthHeaders(),
-            body: JSON.stringify(updatedData)
+            body: JSON.stringify(dataToSend)
         });
         const result = await response.json();
 
-        if (response.ok) {
-            alert(result.message);
-            document.getElementById('editUserModal').remove(); // Tutup modal
-            fetchUsers();
-        } else if (response.status === 401 || response.status === 403) {
-            alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
-            localStorage.removeItem('token');
-            window.location.href = '/login';
+        if (response.ok && result.success) {
+            alert(result.message || 'Pengguna berhasil diperbarui.');
+            const modalToRemove = document.getElementById('editUserModal');
+            if (modalToRemove) modalToRemove.remove();
+            fetchUsers(); 
         } else {
             alert(result.message || 'Gagal memperbarui pengguna.');
+            console.error('Gagal memperbarui pengguna (frontend):', result);
         }
     } catch (error) {
         console.error('script.js (handleUpdateUser): Error updating user:', error);
@@ -577,24 +714,22 @@ async function handleDeleteUser(event) {
 
 async function handleVerifyUser(event) {
     const userId = event.target.dataset.id;
+    const userName = event.target.closest('tr')?.querySelector('td:nth-child(2)')?.textContent || `pengguna ID ${userId}`;
+
     if (confirm(`Anda yakin ingin memverifikasi pengguna ID: ${userId}?`)) {
         try {
-            const response = await fetch(`/admin/users/${userId}`, {
-                method: 'PUT',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ id_status_valid: 1 })
+            const response = await fetch(`/admin/users/${userId}/verify`, { // Endpoint baru
+                method: 'PUT', // PUT tetap cocok untuk mengubah status resource
+                headers: getAuthHeaders()
             });
             const result = await response.json();
 
-            if (response.ok) {
-                alert(result.message);
-                fetchUsers();
-            } else if (response.status === 401 || response.status === 403) {
-                alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
-                localStorage.removeItem('token');
-                window.location.href = '/login';
+            if (response.ok && result.success) { // Pastikan backend mengirim success: true
+                alert(result.message || `Pengguna "${userName}" berhasil diverifikasi.`);
+                fetchUsers(); // Muat ulang daftar pengguna
             } else {
-                alert(result.message || 'Gagal memverifikasi pengguna.');
+                alert(result.message || `Gagal memverifikasi pengguna "${userName}".`);
+                console.error('Gagal memverifikasi pengguna (frontend):', result);
             }
         } catch (error) {
             console.error('script.js (handleVerifyUser): Error verifying user:', error);
@@ -1036,21 +1171,26 @@ async function handleNewAppointmentFormSubmit(event) {
 
 // --- Event listener utama untuk DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => {
-
+    // Pindahkan semua event listener form dan tombol global ke sini
     const loginForm = document.querySelector('#loginForm');
     if (loginForm) loginForm.addEventListener('submit', handleLoginFormSubmit);
+    
     const adminRegisterForm = document.querySelector('#adminRegisterForm');
     if (adminRegisterForm) adminRegisterForm.addEventListener('submit', handleAdminRegisterFormSubmit);
+    
     const registerForm = document.querySelector('#registerForm');
     if (registerForm) registerForm.addEventListener('submit', handleRegisterFormSubmit);
+    
     const resendVerificationForm = document.querySelector('#resendVerificationForm');
     if (resendVerificationForm) resendVerificationForm.addEventListener('submit', handleResendVerificationEmail);
+    
     const forgotPasswordForm = document.querySelector('#forgotPasswordForm');
     if (forgotPasswordForm) forgotPasswordForm.addEventListener('submit', handleForgotPasswordFormSubmit);
+    
     const resetPasswordForm = document.querySelector('#resetPasswordForm');
     if (resetPasswordForm) resetPasswordForm.addEventListener('submit', handleResetPasswordFormSubmit);
     
-
+    // Event listener untuk form Tambah Pengguna (dari section add-user di dashboard.ejs)
     const addUserForm = document.getElementById('addUserForm');
     if (addUserForm) {
         addUserForm.addEventListener('submit', async (event) => {
@@ -1065,32 +1205,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             try {
-                const response = await fetch('/admin/users', {
+                const response = await fetch('/admin/users', { // POST ke endpoint tambah user
                     method: 'POST',
                     headers: getAuthHeaders(),
                     body: JSON.stringify(userData)
                 });
                 const result = await response.json();
 
-                if (response.ok) {
+                if (response.ok && result.success) { // Asumsi backend mengirim success:true
                     alert(result.message);
                     form.reset();
-                    fetchUsers();
-                } else if (response.status === 401 || response.status === 403) {
-                    alert('Sesi Anda telah berakhir atau Anda tidak memiliki izin. Silakan login kembali.');
-                    localStorage.removeItem('token');
-                    window.location.href = '/login';
+                    // Jika section user-list aktif, panggil fetchUsers untuk refresh.
+                    // Atau, jika ingin selalu refresh:
+                    if (typeof fetchUsers === 'function' && document.getElementById('userListBody')) {
+                         fetchUsers();
+                    }
+                    // Mungkin juga perlu menutup section 'add-user-section' dan menampilkan 'user-list-section'
+                    // Ini bisa dihandle oleh logika navigasi di dashboard.ejs atau di sini
                 } else {
                     alert(result.message || 'Gagal menambahkan pengguna.');
                 }
             } catch (error) {
-                console.error('script.js (addUserForm): Error adding user:', error);
+                console.error('script.js (addUserForm submit): Error adding user:', error);
                 alert('Terjadi kesalahan saat menambahkan pengguna.');
             }
         });
     }
 
-    // --- Fungsi Logout ---
     const globalLogoutButton = document.getElementById('logoutButton'); 
     if (globalLogoutButton) {
         globalLogoutButton.addEventListener('click', () => {
@@ -1100,50 +1241,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Panggilan Fungsi Dashboard/User Management Awal
+    // Panggilan Fungsi Dashboard Awal
     const currentPath = window.location.pathname;
-
     if (currentPath === '/admin/dashboard') {
-        console.log('script.js (DOMContentLoaded): On admin dashboard page. Attempting to fetch data.');
+        console.log('script.js (DOMContentLoaded): On admin dashboard page. Attempting to fetch initial data.');
         const token = getToken();
         if (!token) {
             console.warn('script.js (DOMContentLoaded): No token found for admin dashboard. Redirecting to login.');
             alert('Sesi Anda telah berakhir atau Anda belum login. Silakan login kembali.');
             localStorage.removeItem('token');
             window.location.href = '/login';
-            return;
+            return; // Hentikan eksekusi lebih lanjut jika tidak ada token
         }
-        if (typeof fetchDashboardData === 'function') fetchDashboardData();
+        // fetchDashboardData dipanggil dari inline script di dashboard.ejs setelah elemennya ada
+        // fetchUsers juga dipanggil dari showSection di dashboard.ejs saat section user-list aktif
     } else if (currentPath === '/pasien/dashboard') {
-        console.log('script.js (DOMContentLoaded): On patient dashboard page. Attempting to fetch data.');
-        const token = getToken();
-        if (!token) {
-            console.warn('script.js (DOMContentLoaded): No token found for patient dashboard. Redirecting to login.');
-            alert('Sesi Anda telah berakhir atau Anda belum login. Silakan login kembali.');
-            localStorage.removeItem('token');
-            window.location.href = '/login';
-            return;
-        }
-        fetchPatientDashboardData();
-
-        loadBookingFormData();
-
-        const doctorSelect = document.getElementById('doctorSelect');
-        const appointmentDate = document.getElementById('appointmentDate');
-        const newAppointmentForm = document.getElementById('newAppointmentForm');
-
-        if (doctorSelect) {
-            doctorSelect.addEventListener('change', loadAvailableDoctorSlots);
-        }
-        if (appointmentDate) {
-            appointmentDate.addEventListener('change', loadAvailableDoctorSlots);
-            appointmentDate.min = new Date().toISOString().split('T')[0];
-        }
-        if (newAppointmentForm) {
-            newAppointmentForm.addEventListener('submit', handleNewAppointmentFormSubmit);
-        }
+        // ... (logika untuk dashboard pasien) ...
     } else {
-        console.log('script.js (DOMContentLoaded): Not on admin or patient dashboard. Skipping data fetch.');
+        console.log('script.js (DOMContentLoaded): Not on admin or patient dashboard. Skipping specific initial data fetch for those.');
     }
 
     // --- Navigasi & Dropdown Menu ---

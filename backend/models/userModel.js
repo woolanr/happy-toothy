@@ -12,27 +12,21 @@ const User = {
         return rows;
     },
     findById: async (id_user) => {
-        const [rows] = await db.execute(`
-            SELECT 
-                u.id_user, 
-                u.username, 
-                u.email, 
-                u.id_level_user, 
-                u.id_status_valid,
-                u.verification_token,
-                u.verification_expires,
-                p.id_profile, 
-                p.nama_lengkap, 
-                p.jenis_kelamin, 
-                p.tanggal_lahir, 
-                p.alamat, 
-                p.no_telepon
-            FROM USERS u 
-            LEFT JOIN PROFILE p ON u.id_profile = p.id_profile 
-            WHERE u.id_user = ?
-        `, [id_user]);
-        return rows.length > 0 ? rows[0] : null; 
-    },
+    const query = `
+        SELECT 
+            u.id_user, u.username, u.email, u.id_level_user, u.id_status_valid,
+            u.verification_token, u.verification_expires,
+            p.id_profile, p.nama_lengkap, p.jenis_kelamin, p.tanggal_lahir, p.alamat, p.no_telepon,
+            d.id_doctor, d.spesialisasi, d.lisensi_no, d.pengalaman_tahun 
+            -- Tambahkan field lain dari doctors jika perlu
+        FROM USERS u 
+        LEFT JOIN PROFILE p ON u.id_profile = p.id_profile 
+        LEFT JOIN DOCTORS d ON u.id_user = d.id_user  -- LEFT JOIN ke tabel doctors
+        WHERE u.id_user = ?
+    `;
+    const [rows] = await db.execute(query, [id_user]);
+    return rows.length > 0 ? rows[0] : null; 
+},
 
     // --- FUNGSI UTAMA: CREATE USER DAN PROFILE DALAM SATU TRANSAKSI ---
     createFullUser: async (data) => {
@@ -273,6 +267,24 @@ const User = {
             console.log('userModel: Connection released after softDeleteDoctorByDoctorId attempt.');
         }
     },
+
+    deleteDoctorEntryByUserId: async (userId) => {
+        console.log(`userModel: deleteDoctorEntryByUserId called for userId: ${userId}`);
+        const sql = 'DELETE FROM DOCTORS WHERE id_user = ?';
+        
+        try {
+            const [result] = await db.execute(sql, [userId]);
+            if (result.affectedRows > 0) {
+                console.log(`   Successfully deleted doctor-specific details for user ${userId}.`);
+            } else {
+                console.log(`   No doctor-specific details found to delete for user ${userId}, or already deleted.`);
+            }
+            return result; // Mengembalikan hasil operasi delete
+        } catch (error) {
+            console.error(`userModel: Error deleting doctor entry for userId ${userId}:`, error);
+            throw error; // Biarkan controller menangani error HTTP
+        }
+    },
     
 
     // --- FUNGSI VERIFIKASI & RESET TOKEN (Diubah ke async/await) ---
@@ -326,7 +338,7 @@ const User = {
         const query = `
             SELECT 
                 d.id_doctor, d.id_user, d.spesialisasi, d.lisensi_no, d.pengalaman_tahun, d.foto_profil_url, d.rating_rata2,
-                u.username, u.email, 
+                u.username, u.email, u.id_profile,
                 p.nama_lengkap, p.no_telepon 
             FROM DOCTORS d 
             JOIN USERS u ON d.id_user = u.id_user 
@@ -370,6 +382,46 @@ const User = {
             console.error("Error in User.findAllDoctorsWithDetails model:", error);
             throw error;
         }
+    },
+
+    findDoctorRecordByUserId: async (userId) => {
+        console.log(`userModel: findDoctorRecordByUserId called for userId: ${userId}`);
+        const query = 'SELECT id_doctor FROM DOCTORS WHERE id_user = ?';
+        const [rows] = await db.execute(query, [userId]);
+        return rows.length > 0 ? rows[0] : null;
+    },
+
+    updateDoctorDetails: async (doctorId, doctorData) => {
+        console.log(`userModel: updateDoctorDetails called for doctorId: ${doctorId} with data:`, doctorData);
+        if (!doctorId || Object.keys(doctorData).length === 0) {
+            console.log('userModel: No doctorId or data to update doctor details.');
+            return { affectedRows: 0 };
+        }
+        let setClauses = [];
+        let values = [];
+        for (const key in doctorData) {
+            if (doctorData[key] !== undefined) {
+                setClauses.push(`${key} = ?`);
+                values.push(doctorData[key]);
+            }
+        }
+        if (setClauses.length === 0) return { affectedRows: 0 };
+        values.push(doctorId);
+        const sql = `UPDATE DOCTORS SET ${setClauses.join(', ')} WHERE id_doctor = ?`;
+        const [result] = await db.execute(sql, values);
+        console.log(`userModel: DOCTORS table updated for id_doctor: ${doctorId}, affected rows: ${result.affectedRows}`);
+        return result;
+    },
+
+    // Method untuk membuat entri baru di tabel DOCTORS untuk user yang sudah ada
+    createDoctorEntryForUser: async (userId, doctorData) => {
+        console.log(`userModel: createDoctorEntryForUser called for userId: ${userId} with data:`, doctorData);
+        const { spesialisasi, lisensi_no, pengalaman_tahun } = doctorData;
+        const sql = 'INSERT INTO DOCTORS (id_user, spesialisasi, lisensi_no, pengalaman_tahun) VALUES (?, ?, ?, ?)';
+        const values = [userId, spesialisasi, lisensi_no, pengalaman_tahun];
+        const [result] = await db.execute(sql, values);
+        console.log(`userModel: New entry in DOCTORS created for userId: ${userId}, new id_doctor: ${result.insertId}`);
+        return result;
     },
 
     findAllServices: async () => {
@@ -496,6 +548,49 @@ const User = {
             return result;
         } catch (error) {
             console.error(`userModel: Error updating user with id_user ${id_user}:`, error);
+            throw error; // Biarkan controller menangani error HTTP
+        }
+    },
+
+    updateProfile: async (id_profile, profileDataToUpdate) => {
+        console.log(`userModel: updateProfile called for id_profile: ${id_profile} with data:`, profileDataToUpdate);
+
+        // Pastikan ada data untuk diupdate dan id_profile valid
+        if (!id_profile || Object.keys(profileDataToUpdate).length === 0) {
+            console.log('userModel: No data or id_profile provided to update profile.');
+            // Kamu bisa throw error atau return indikasi tidak ada update
+            // Untuk konsistensi dengan updateUser, kita bisa return affectedRows 0
+            return { affectedRows: 0, message: 'Tidak ada data profil atau ID profil yang diupdate.' };
+        }
+
+        let setClauses = [];
+        let values = [];
+
+        // Bangun SET clause secara dinamis untuk field yang ada di profileDataToUpdate
+        // Pastikan key di profileDataToUpdate sesuai dengan nama kolom di tabel PROFILE
+        for (const key in profileDataToUpdate) {
+            if (profileDataToUpdate[key] !== undefined) { // Hanya update jika ada nilainya
+                setClauses.push(`${key} = ?`);
+                values.push(profileDataToUpdate[key]);
+            }
+        }
+
+        if (setClauses.length === 0) {
+            console.log('userModel: No valid fields to update for profile:', id_profile);
+            return { affectedRows: 0, message: 'Tidak ada field profil valid yang diupdate.' };
+        }
+
+        values.push(id_profile); // Tambahkan id_profile untuk WHERE clause
+
+        const sql = `UPDATE PROFILE SET ${setClauses.join(', ')} WHERE id_profile = ?`;
+        console.log('userModel: Executing SQL for profile update:', sql, 'with values:', values);
+
+        try {
+            const [result] = await db.execute(sql, values);
+            console.log('userModel: updateProfile successful, affected rows:', result.affectedRows);
+            return result;
+        } catch (error) {
+            console.error(`userModel: Error updating profile with id_profile ${id_profile}:`, error);
             throw error; // Biarkan controller menangani error HTTP
         }
     },
