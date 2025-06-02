@@ -11,7 +11,6 @@ function getAuthHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
-        console.log('script.js (global): getAuthHeaders() returning WITH Authorization header.');
     }
     return headers;
 }
@@ -738,7 +737,37 @@ async function handleVerifyUser(event) {
     }
 }
 
-//--- Fungsi Manajemen Dokter ---
+async function handleActivateUser(userId, userName) {
+    console.log(`handleActivateUser called for userId: ${userId}, name: ${userName}`);
+
+    if (confirm(`Anda yakin ingin mengaktifkan kembali akun untuk "${userName}" (User ID: ${userId})?`)) {
+        try {
+            const response = await fetch(`/admin/users/${userId}/activate`, {
+                method: 'PUT',
+                headers: getAuthHeaders()
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                alert(result.message || `Akun untuk "${userName}" berhasil diaktifkan kembali.`);
+                if (document.getElementById('userListBody')) {
+                    fetchUsers(); 
+                }
+            } else {
+                alert(result.message || `Gagal mengaktifkan akun untuk "${userName}".`);
+                console.error('Gagal mengaktifkan akun:', result);
+            }
+        } catch (error) {
+            console.error('Error di handleActivateUser:', error);
+            alert('Terjadi kesalahan saat mencoba mengaktifkan akun pengguna.');
+        }
+    } else {
+        console.log('Activation cancelled by user.');
+    }
+}
+
+//--- ADMIN: FUNGSI MANAJEMEN DOKTER ---
 async function fetchDoctors() {
     try {
         console.log('script.js (fetchDoctors): Fetching doctors data...');
@@ -840,7 +869,6 @@ function populateDoctorTable(doctors) {
     }
 }
 
-// FUungsi Untuk  Alur Edit Dokter
 async function handleEditDoctorFlow(doctorId) {
     console.log(`handleEditDoctorFlow called for doctorId: ${doctorId}`);
     const addDoctorModalElement = document.getElementById('addDoctorModal');
@@ -925,35 +953,215 @@ async function handleDeactivateDoctor(doctorId, userId, doctorName) {
     }
 }
 
-async function handleActivateUser(userId, userName) {
-    console.log(`handleActivateUser called for userId: ${userId}, name: ${userName}`);
 
-    if (confirm(`Anda yakin ingin mengaktifkan kembali akun untuk "${userName}" (User ID: ${userId})?`)) {
+// --- ADMIN : MANAJEMEN LAYANAN --- 
+
+let addServiceModalElement, openAddServiceModalButton, closeServiceModalBtn, 
+    cancelServiceModalBtn, addServiceForm, serviceModalTitle, 
+    saveServiceBtn, editServiceIdInput;
+
+async function fetchServices(status = 'Aktif') {
+    try {
+        console.log(`script.js (fetchServices): Fetching services data with status: ${status}...`);
+        const response = await fetch(`/admin/services?status=${status}`, { 
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        const result = await response.json();
+        console.log('script.js (fetchServices): API Response result:', result);
+
+        const serviceListBody = document.getElementById('serviceListBody');
+        if (!serviceListBody) {
+            console.error("fetchServices: Element with ID 'serviceListBody' not found.");
+            return;
+        }
+
+        if (response.ok && result.success && result.data) {
+            populateServiceTable(result.data, status); // Kirim juga status filter saat ini
+        } else {
+            console.error('script.js (fetchServices): Failed to fetch services -', result ? result.message : 'No result message from API');
+            const colspanCount = document.querySelector('#service-management-section table thead th')?.parentElement.childElementCount || 7;
+            serviceListBody.innerHTML = `<tr><td colspan="${colspanCount}" class="text-center">${(result && result.message) || 'Gagal memuat data layanan.'}</td></tr>`;
+        }
+    } catch (error) {
+        console.error('script.js (fetchServices): Error fetching services:', error);
+        const serviceListBody = document.getElementById('serviceListBody');
+        if (serviceListBody) {
+            const colspanCount = document.querySelector('#service-management-section table thead th')?.parentElement.childElementCount || 7;
+            serviceListBody.innerHTML = `<tr><td colspan="${colspanCount}" class="text-center">Terjadi kesalahan saat memuat data layanan.</td></tr>`;
+        } else {
+            alert('Terjadi kesalahan saat memuat data layanan.');
+        }
+    }
+}
+
+function populateServiceTable(services, currentFilterStatus = 'Aktif') {
+    console.log('populateServiceTable called with services:', services); // PENTING: Periksa struktur 'services' di sini
+    const serviceListBody = document.getElementById('serviceListBody');
+    if (!serviceListBody) {
+        console.error("populateServiceTable: Element with ID 'serviceListBody' not found.");
+        return;
+    }
+    serviceListBody.innerHTML = ''; 
+
+    // Sesuaikan dengan jumlah kolom TH di tabel layananmu (ID, Nama, Desk, Durasi, Harga, Status, Aksi = 7)
+    const headers = document.querySelectorAll('#service-management-section table thead th');
+    const colspanCount = headers.length || 7; 
+
+    if (services && services.length > 0) {
+        console.log('populateServiceTable: Processing services data to create table rows.');
+        services.forEach(service => { 
+            const row = serviceListBody.insertRow();
+            const formattedHarga = new Intl.NumberFormat('id-ID', { 
+                style: 'currency', 
+                currency: 'IDR',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0 
+            }).format(service.harga);
+
+            let actionButtons = '';
+            // Pastikan 'service.status_layanan' ada dan nilainya 'Aktif' atau 'Nonaktif' (case-sensitive)
+            console.log(`Service: ${service.nama_layanan}, Status: ${service.status_layanan}`); // Debug status
+
+            if (service.status_layanan === 'Aktif') {
+                actionButtons = `
+                    <button class="btn btn-sm btn-edit edit-service-btn" data-id="${service.id_service}">Edit</button>
+                    <button class="btn btn-sm btn-danger delete-service-btn" data-id="${service.id_service}" data-name="${service.nama_layanan}">Nonaktifkan</button>
+                `;
+            } else if (service.status_layanan === 'Nonaktif') {
+                actionButtons = `
+                    <button class="btn btn-sm btn-success activate-service-btn" data-id="${service.id_service}" data-name="${service.nama_layanan}">Aktifkan</button>
+                    `;
+            } else {
+                console.warn(`Status layanan tidak dikenal untuk layanan ID ${service.id_service}: ${service.status_layanan}`);
+            }
+
+            const rowHTML = `
+                <td>${service.id_service || 'N/A'}</td>
+                <td>${service.nama_layanan || '-'}</td>
+                <td>${service.deskripsi || '-'}</td>
+                <td>${service.durasi_menit !== null ? service.durasi_menit + ' menit' : '-'}</td>
+                <td>${formattedHarga}</td>
+                <td><span class="status ${String(service.status_layanan).toLowerCase() === 'aktif' ? 'status-active' : 'status-inactive'}">${service.status_layanan || 'Tidak Diketahui'}</span></td>
+                <td class="user-actions">
+                    ${actionButtons}
+                </td>
+            `;
+            row.innerHTML = rowHTML;
+
+            // Pasang event listener
+            const editServiceButton = row.querySelector('.edit-service-btn');
+            if (editServiceButton) {
+                editServiceButton.addEventListener('click', function() {
+                    const serviceId = this.dataset.id;
+                    if(serviceId) handleEditService(serviceId); 
+                });
+            }
+            
+            const deleteServiceButton = row.querySelector('.delete-service-btn');
+            if (deleteServiceButton) {
+                deleteServiceButton.addEventListener('click', function() {
+                    const serviceId = this.dataset.id;
+                    const serviceName = this.dataset.name;
+                    if (serviceId) handleDeleteService(serviceId, serviceName);
+                });
+            }
+
+            const activateServiceButton = row.querySelector('.activate-service-btn');
+            if (activateServiceButton) {
+                activateServiceButton.addEventListener('click', function() {
+                    const serviceId = this.dataset.id;
+                    const serviceName = this.dataset.name;
+                    if (serviceId) handleActivateService(serviceId, serviceName);
+                });
+            }
+        });
+    } else {
+        console.log(`populateServiceTable: No services data to display for filter "${currentFilterStatus}".`);
+        serviceListBody.innerHTML = `<tr><td colspan="${colspanCount}" class="text-center">Tidak ada data layanan untuk filter "${currentFilterStatus}".</td></tr>`;
+    }
+}
+
+async function handleEditService(serviceId) { // Untuk mengisi form saat tombol edit layanan diklik
+    console.log(`handleEditService called for serviceId: ${serviceId}`);
+    if (!addServiceModalElement || !addServiceForm || !serviceModalTitle || !saveServiceBtn || !editServiceIdInput) {
+        console.error('Elemen modal layanan tidak terinisialisasi dengan benar untuk handleEditService.');
+        alert('Gagal menyiapkan form edit layanan.');
+        return;
+    }
+    try {
+        const response = await fetch(`/admin/services/${serviceId}`, {
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        const result = await response.json();
+        if (response.ok && result.success && result.data) {
+            const service = result.data;
+            console.log('Data layanan diterima untuk diedit:', service);
+            addServiceForm.reset(); 
+            document.getElementById('addService_nama_layanan').value = service.nama_layanan || '';
+            document.getElementById('addService_deskripsi').value = service.deskripsi || '';
+            document.getElementById('addService_harga').value = service.harga !== null ? parseFloat(service.harga) : '';
+            document.getElementById('addService_durasi_menit').value = service.durasi_menit !== null ? parseInt(service.durasi_menit) : '';
+            editServiceIdInput.value = service.id_service;
+            serviceModalTitle.textContent = 'Edit Data Layanan';
+            saveServiceBtn.textContent = 'Update Layanan';
+            addServiceModalElement.style.display = 'block';
+        } else {
+            alert(result.message || `Gagal mengambil data layanan dengan ID: ${serviceId}`);
+        }
+    } catch (error) {
+        console.error('Error di handleEditService:', error);
+        alert('Terjadi kesalahan saat memuat data layanan untuk diedit.');
+    }
+}
+
+async function handleDeleteService(serviceId, serviceName) { // Untuk menonaktifkan layanan
+    console.log(`handleDeleteService (deactivate) called for serviceId: ${serviceId}, name: ${serviceName}`);
+    if (confirm(`Anda yakin ingin menonaktifkan layanan "${serviceName}"?`)) {
         try {
-            const response = await fetch(`/admin/users/${userId}/activate`, {
+            const response = await fetch(`/admin/services/${serviceId}/deactivate`, {
+                method: 'PUT', 
+                headers: getAuthHeaders()
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                alert(result.message || `Layanan "${serviceName}" berhasil dinonaktifkan.`);
+                const currentFilter = document.getElementById('serviceStatusFilter')?.value || 'Aktif';
+                fetchServices(currentFilter);
+            } else {
+                alert(result.message || `Gagal menonaktifkan layanan "${serviceName}".`);
+            }
+        } catch (error) {
+            console.error('Error di handleDeleteService:', error);
+            alert('Terjadi kesalahan saat menonaktifkan layanan.');
+        }
+    }
+}
+
+async function handleActivateService(serviceId, serviceName) { // Untuk mengaktifkan layanan
+    console.log(`handleActivateService called for serviceId: ${serviceId}, name: ${serviceName}`);
+    if (confirm(`Anda yakin ingin mengaktifkan kembali layanan "${serviceName}"?`)) {
+        try {
+            const response = await fetch(`/admin/services/${serviceId}/activate`, {
                 method: 'PUT',
                 headers: getAuthHeaders()
             });
-
             const result = await response.json();
-
             if (response.ok && result.success) {
-                alert(result.message || `Akun untuk "${userName}" berhasil diaktifkan kembali.`);
-                if (document.getElementById('userListBody')) {
-                    fetchUsers(); 
-                }
+                alert(result.message || `Layanan "${serviceName}" berhasil diaktifkan kembali.`);
+                const currentFilter = document.getElementById('serviceStatusFilter')?.value || 'Aktif';
+                fetchServices(currentFilter);
             } else {
-                alert(result.message || `Gagal mengaktifkan akun untuk "${userName}".`);
-                console.error('Gagal mengaktifkan akun:', result);
+                alert(result.message || `Gagal mengaktifkan layanan "${serviceName}".`);
             }
         } catch (error) {
-            console.error('Error di handleActivateUser:', error);
-            alert('Terjadi kesalahan saat mencoba mengaktifkan akun pengguna.');
+            console.error('Error di handleActivateService:', error);
+            alert('Terjadi kesalahan saat mengaktifkan layanan.');
         }
-    } else {
-        console.log('Activation cancelled by user.');
     }
 }
+
 
 // --- Fungsi untuk Pasien Dashboard & Booking ---
 async function fetchPatientDashboardData() {
@@ -1171,7 +1379,126 @@ async function handleNewAppointmentFormSubmit(event) {
 
 // --- Event listener utama untuk DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => {
-    // Pindahkan semua event listener form dan tombol global ke sini
+    console.log('DOM fully loaded and parsed');
+
+    // --- Inisialisasi Variabel Elemen Modal Layanan ---
+    addServiceModalElement = document.getElementById('addServiceModal');
+    openAddServiceModalButton = document.getElementById('openAddServiceModalButton');
+    closeServiceModalBtn = document.getElementById('closeServiceModalBtn');
+    cancelServiceModalBtn = document.getElementById('cancelServiceModalBtn');
+    addServiceForm = document.getElementById('addServiceForm');
+    serviceModalTitle = document.getElementById('serviceModalTitle');
+    saveServiceBtn = document.getElementById('saveServiceBtn');
+    editServiceIdInput = document.getElementById('editServiceId');
+    
+    console.log('Service Modal Elements:', { // Log untuk cek elemen modal layanan
+        addServiceModalElement, openAddServiceModalButton, closeServiceModalBtn,
+        cancelServiceModalBtn, addServiceForm, serviceModalTitle,
+        saveServiceBtn, editServiceIdInput
+    });
+
+    // Event listener untuk tombol "Tambah Layanan Baru"
+    if (openAddServiceModalButton && addServiceModalElement && addServiceForm) {
+        openAddServiceModalButton.addEventListener('click', () => {
+            console.log('Tombol "Tambah Layanan Baru" diklik.');
+            addServiceForm.reset(); 
+            if(editServiceIdInput) editServiceIdInput.value = ''; 
+            if(serviceModalTitle) serviceModalTitle.textContent = 'Tambah Layanan Baru';
+            if(saveServiceBtn) saveServiceBtn.textContent = 'Simpan Layanan';
+            addServiceModalElement.style.display = 'block';
+        });
+    } else {
+        if (!openAddServiceModalButton && window.location.pathname.includes('/admin/dashboard')) { // Hanya log jika di dashboard admin
+             console.warn("Tombol 'Tambah Layanan Baru' (openAddServiceModalButton) tidak ditemukan. Pastikan ID tombol di HTML section layanan sudah benar.");        
+        }
+    }
+
+    // Fungsi untuk menutup modal 
+    function closeServiceModal() { if (addServiceModalElement) addServiceModalElement.style.display = 'none'; }
+    if (closeServiceModalBtn) closeServiceModalBtn.addEventListener('click', closeServiceModal);
+    if (cancelServiceModalBtn) cancelServiceModalBtn.addEventListener('click', closeServiceModal);
+    if (addServiceModalElement) { window.addEventListener('click', (event) => { if (event.target == addServiceModalElement) closeServiceModal(); }); }
+
+    // Event listener untuk submit form layanan (Tambah & Edit)
+    if (addServiceForm) {
+        addServiceForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            // Ambil serviceId dari hidden input yang di-set oleh handleEditService
+            const serviceIdFromForm = editServiceIdInput ? editServiceIdInput.value : null; 
+            const isEditMode = !!serviceIdFromForm;
+
+            const serviceDataFromForm = {
+                nama_layanan: document.getElementById('addService_nama_layanan').value,
+                deskripsi: document.getElementById('addService_deskripsi').value,
+                harga: document.getElementById('addService_harga').value,
+                durasi_menit: document.getElementById('addService_durasi_menit').value
+            };
+
+            if (!serviceDataFromForm.nama_layanan || !serviceDataFromForm.harga) {
+            alert('Nama layanan dan harga wajib diisi.');
+            return;
+        }
+        if (parseFloat(serviceDataFromForm.harga) < 0 || (serviceDataFromForm.durasi_menit && parseInt(serviceDataFromForm.durasi_menit) < 0)) {
+            alert('Harga dan durasi tidak boleh negatif.');
+            return;
+        }
+
+        const payload = {
+            nama_layanan: serviceDataFromForm.nama_layanan,
+            deskripsi: serviceDataFromForm.deskripsi || null,
+            harga: parseFloat(serviceDataFromForm.harga),
+            durasi_menit: serviceDataFromForm.durasi_menit ? parseInt(serviceDataFromForm.durasi_menit) : null
+        };
+
+        let url = '/admin/services';
+        let method = 'POST';
+
+        if (isEditMode) {
+            url = `/admin/services/${serviceIdFromForm}`; 
+            method = 'PUT';                     
+            console.log(`Mode Edit Layanan. Mengirim PUT ke: ${url} dengan data:`, payload);
+        } else {
+            console.log(`Mode Tambah Layanan. Mengirim POST ke: ${url} dengan data:`, payload);
+        }
+        
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: getAuthHeaders(),
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                    alert(result.message || (isEditMode ? 'Layanan berhasil diupdate!' : 'Layanan baru berhasil ditambahkan!'));
+                    closeServiceModal(); 
+                    if (typeof fetchServices === 'function') fetchServices();
+                } else {
+                    alert(result.message || (isEditMode ? 'Gagal mengupdate layanan.' : 'Gagal menambahkan layanan baru.'));
+                    console.error('Gagal menyimpan layanan:', result);
+                }
+            } catch (error) {
+                console.error('Error saat mengirim data layanan:', error);
+                alert('Terjadi kesalahan saat menghubungi server.');
+            }
+        });
+    } else {
+        if (window.location.pathname.includes('/admin/dashboard')) { // Hanya log jika di dashboard admin
+            console.warn("Form 'addServiceForm' tidak ditemukan.");
+        }
+    }
+
+    const serviceStatusFilterElement = document.getElementById('serviceStatusFilter');
+    if (serviceStatusFilterElement) {
+        serviceStatusFilterElement.addEventListener('change', function() {
+            const selectedStatus = this.value;
+            console.log(`Filter layanan diubah menjadi: ${selectedStatus}`);
+            if (typeof fetchServices === 'function') fetchServices(selectedStatus);
+        });
+    }
+
+    // --- Inisialisasi Event Listeners untuk Formulir Login, Registrasi, dll. ---
+
     const loginForm = document.querySelector('#loginForm');
     if (loginForm) loginForm.addEventListener('submit', handleLoginFormSubmit);
     
@@ -1190,7 +1517,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resetPasswordForm = document.querySelector('#resetPasswordForm');
     if (resetPasswordForm) resetPasswordForm.addEventListener('submit', handleResetPasswordFormSubmit);
     
-    // Event listener untuk form Tambah Pengguna (dari section add-user di dashboard.ejs)
     const addUserForm = document.getElementById('addUserForm');
     if (addUserForm) {
         addUserForm.addEventListener('submit', async (event) => {
@@ -1215,13 +1541,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (response.ok && result.success) { // Asumsi backend mengirim success:true
                     alert(result.message);
                     form.reset();
-                    // Jika section user-list aktif, panggil fetchUsers untuk refresh.
-                    // Atau, jika ingin selalu refresh:
                     if (typeof fetchUsers === 'function' && document.getElementById('userListBody')) {
                          fetchUsers();
                     }
-                    // Mungkin juga perlu menutup section 'add-user-section' dan menampilkan 'user-list-section'
-                    // Ini bisa dihandle oleh logika navigasi di dashboard.ejs atau di sini
                 } else {
                     alert(result.message || 'Gagal menambahkan pengguna.');
                 }
@@ -1247,11 +1569,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('script.js (DOMContentLoaded): On admin dashboard page. Attempting to fetch initial data.');
         const token = getToken();
         if (!token) {
-            console.warn('script.js (DOMContentLoaded): No token found for admin dashboard. Redirecting to login.');
+            console.warn('script.js (DOMContentLoaded): No token found, redirecting to login.');
             alert('Sesi Anda telah berakhir atau Anda belum login. Silakan login kembali.');
             localStorage.removeItem('token');
             window.location.href = '/login';
-            return; // Hentikan eksekusi lebih lanjut jika tidak ada token
+            return; 
         }
         // fetchDashboardData dipanggil dari inline script di dashboard.ejs setelah elemennya ada
         // fetchUsers juga dipanggil dari showSection di dashboard.ejs saat section user-list aktif

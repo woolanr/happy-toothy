@@ -1316,3 +1316,12 @@ body {
 .modal-body .form-actions {
     margin-top: 20px;
 }
+
+.status-active {
+    color: green;
+    font-weight: bold;
+}
+.status-inactive {
+    color: red;
+    font-style: italic;
+}

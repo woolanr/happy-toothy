@@ -227,9 +227,74 @@
             </section>
 
             <section class="content-section hidden" id="service-management-section">
-                <h2>Manajemen Layanan</h2>
-                <p>Konten untuk mengelola layanan klinik akan ditampilkan di sini.</p>
+                <div class="section-header">
+                    <h2>Manajemen Layanan</h2>
+                    <button class="btn btn-primary" id="openAddServiceModalButton">
+                        <i class="fas fa-plus"></i> Tambah Layanan Baru
+                    </button>
+                </div>
+
+                <div class="filter-controls" style="margin-bottom: 20px; margin-top:10px;">
+                    <label for="serviceStatusFilter" style="margin-right: 10px;">Filter Status:</label>
+                    <select id="serviceStatusFilter">
+                        <option value="Aktif">Aktif</option>
+                        <option value="Nonaktif">Nonaktif</option>
+                        <option value="Semua">Semua</option>
+                    </select>
+                </div>
+                <div class="data-table-container card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nama Layanan</th>
+                                <th>Deskripsi</th>
+                                <th>Durasi (Menit)</th>
+                                <th>Harga (Rp)</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>                    
+                        <tbody id="serviceListBody">
+                            <tr><td colspan="6" class="text-center">Memuat data layanan...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
+
+            <div id="addServiceModal" class="modal">
+                <div class="modal-content card">    
+                    <div class="modal-header">
+                        <h2 id="serviceModalTitle">Tambah Layanan Baru</h2>
+                        <span class="close-button" id="closeServiceModalBtn">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <form id="addServiceForm" class="auth-form">
+                            <input type="hidden" id="editServiceId" name="editServiceId">
+    
+                            <div class="form-group">
+                                <label for="addService_nama_layanan">Nama Layanan</label>
+                                <input type="text" id="addService_nama_layanan" name="nama_layanan" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="addService_deskripsi">Deskripsi (Opsional)</label>
+                                <textarea id="addService_deskripsi" name="deskripsi" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="addService_harga">Harga (Rp)</label>
+                                <input type="number" id="addService_harga" name="harga" min="0" step="any" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="addService_durasi_menit">Durasi (Menit, Opsional)</label>
+                                <input type="number" id="addService_durasi_menit" name="durasi_menit" min="0">
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" id="saveServiceBtn" class="btn btn-primary btn-full-width">Simpan Layanan</button>
+                                <button type="button" id="cancelServiceModalBtn" class="btn btn-secondary btn-full-width" style="margin-top:10px;">Batal</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
 
             <section class="content-section hidden" id="appointment-management-section">
                 <h2>Manajemen Janji Temu</h2>
@@ -299,7 +364,6 @@
         const currentPath = window.location.pathname;
         if (currentPath === '/admin/dashboard') {
             if (typeof fetchDashboardData === 'function') fetchDashboardData();
-            // fetchUsers(); // Dipanggil oleh showSection jika section user-list aktif
         }
 
         const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
@@ -341,9 +405,14 @@
                     console.log('Attempting to call fetchDoctors for section:', sectionIdToShow);
                     if (typeof fetchDoctors === 'function') fetchDoctors(); else console.error('fetchDoctors function is not defined!');            
                 } else if (sectionIdToShow === 'service-management-section') {
-                    console.log('Attempting to call fetchServices for section:', sectionIdToShow);
-                    // if (typeof fetchServices === 'function') fetchServices();
-                }  
+                console.log('Attempting to call fetchServices for section:', sectionIdToShow);
+                if (typeof fetchServices === 'function') {
+                    const serviceFilter = document.getElementById('serviceStatusFilter');
+                    fetchServices(serviceFilter ? serviceFilter.value : 'Aktif');
+                } else {       
+                    console.error('fetchServices function is not defined!');            
+                }
+            }
             } else {
                 console.warn(`showSection: Section with ID '${sectionIdToShow}' not found.`);
             }
@@ -521,16 +590,31 @@
             });
         }
 
-        const initialActiveItem = document.querySelector('.sidebar-nav .nav-item.active');
-        if (initialActiveItem && initialActiveItem.dataset.section) {
-            showSection(initialActiveItem.dataset.section + '-section');
-        } else {
-            const overviewItem = document.querySelector('.nav-item[data-section="overview"]');
-            if (overviewItem) {
-                overviewItem.classList.add('active');
-                showSection('overview-section');
+        const initialActiveItem = document.querySelector('.sidebar-nav .nav-item.active'); // Cari item menu yang sudah ada kelas .active di HTML
+
+        if (initialActiveItem && initialActiveItem.dataset.section) { // <-- AWAL BLOK IF
+        const initialSectionId = initialActiveItem.dataset.section + '-section';
+        showSection(initialSectionId); 
+
+        if (initialActiveItem.dataset.section === 'service-management') {
+            const serviceFilter = document.getElementById('serviceStatusFilter');
+            if (serviceFilter && typeof fetchServices === 'function') {
+                console.log('Initial view is service-management, fetching services with default filter value:', serviceFilter.value);
+                fetchServices(serviceFilter.value); 
             }
         }
+    } else { // <-- AWAL BLOK ELSE YANG BENAR
+        console.log('No initial active nav item found in HTML, defaulting to overview-section.');
+        const overviewMenuItem = document.querySelector('.sidebar-nav .nav-item[data-section="overview"]');
+        if (overviewMenuItem) {
+            // navItems sudah didefinisikan di atas di dalam DOMContentLoaded yang sama
+            if (typeof navItems !== 'undefined') { 
+                navItems.forEach(nav => nav.classList.remove('active'));
+            }
+            overviewMenuItem.classList.add('active');
+        }
+        showSection('overview-section'); 
+    }
     });
     </script>
 </body>
